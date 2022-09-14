@@ -4,6 +4,7 @@ from typing import (
     Any,
     Callable,
     ClassVar,
+    Generic,
     Hashable,
     Iterable,
     Iterator,
@@ -42,6 +43,7 @@ import xarray as xr
 
 from pandas._typing import (
     S1,
+    T3 as Structure,
     AggFuncType,
     AggFuncTypeBase,
     AggFuncTypeDict,
@@ -167,7 +169,7 @@ class _LocIndexerFrame(_LocIndexer):
         value: S1 | ArrayLike | Series[S1] | list,
     ) -> None: ...
 
-class DataFrame(NDFrame, OpsMixin):
+class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
 
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
