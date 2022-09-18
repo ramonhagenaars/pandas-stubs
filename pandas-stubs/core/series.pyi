@@ -56,6 +56,7 @@ from pandas.core.window.rolling import (
 )
 import xarray as xr
 
+from pandas._libs.missing import NAType
 from pandas._typing import (
     S1,
     AggFuncTypeBase,
@@ -772,7 +773,7 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     @overload
     def fillna(
         self,
-        value: Scalar | dict | Series[S1] | DataFrame | None = ...,
+        value: Scalar | NAType | dict | Series[S1] | DataFrame | None = ...,
         method: FillnaOptions | None = ...,
         axis: SeriesAxisType = ...,
         limit: int | None = ...,
@@ -783,7 +784,7 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     @overload
     def fillna(
         self,
-        value: Scalar | dict | Series[S1] | DataFrame | None = ...,
+        value: Scalar | NAType | dict | Series[S1] | DataFrame | None = ...,
         method: FillnaOptions | None = ...,
         axis: SeriesAxisType = ...,
         *,
@@ -793,7 +794,7 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     @overload
     def fillna(
         self,
-        value: Scalar | dict | Series[S1] | DataFrame | None = ...,
+        value: Scalar | NAType | dict | Series[S1] | DataFrame | None = ...,
         method: FillnaOptions | None = ...,
         axis: SeriesAxisType = ...,
         inplace: _bool = ...,
@@ -804,7 +805,7 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     def replace(
         self,
         to_replace: _str | list | dict | Series[S1] | float | None = ...,
-        value: Scalar | dict | list | _str | None = ...,
+        value: Scalar | NAType | dict | list | _str | None = ...,
         inplace: Literal[False] = ...,
         limit: int | None = ...,
         regex=...,
@@ -814,7 +815,7 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     def replace(
         self,
         to_replace: _str | list | dict | Series[S1] | float | None = ...,
-        value: Scalar | dict | list | _str | None = ...,
+        value: Scalar | NAType | dict | list | _str | None = ...,
         limit: int | None = ...,
         regex=...,
         method: ReplaceMethod = ...,
@@ -825,7 +826,7 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     def replace(
         self,
         to_replace: _str | list | dict | Series[S1] | float | None = ...,
-        value: Scalar | dict | list | _str | None = ...,
+        value: Scalar | NAType | dict | list | _str | None = ...,
         inplace: _bool = ...,
         limit: int | None = ...,
         regex=...,
@@ -1056,8 +1057,6 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
         self,
         start_time: _str | time,
         end_time: _str | time,
-        include_start: _bool = ...,
-        include_end: _bool = ...,
         axis: SeriesAxisType | None = ...,
     ) -> Series[S1]: ...
     def resample(
@@ -1082,14 +1081,18 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
         self,
         axis: SeriesAxisType = ...,
         method: Literal["average", "min", "max", "first", "dense"] = ...,
-        numeric_only: _bool | None = ...,
+        numeric_only: _bool = ...,
         na_option: Literal["keep", "top", "bottom"] = ...,
         ascending: _bool = ...,
         pct: _bool = ...,
     ) -> Series: ...
     def where(
         self,
-        cond: Series[S1] | Series[_bool] | np.ndarray,
+        cond: Series[S1]
+        | Series[_bool]
+        | np.ndarray
+        | Callable[[Series[S1]], Series[bool]]
+        | Callable[[S1], bool],
         other=...,
         inplace: _bool = ...,
         axis: SeriesAxisType | None = ...,
