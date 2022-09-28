@@ -1,4 +1,7 @@
-from datetime import tzinfo
+from datetime import (
+    timedelta,
+    tzinfo,
+)
 from typing import overload
 
 import numpy as np
@@ -21,7 +24,6 @@ from pandas._typing import (
     ArrayLike,
     DatetimeLike,
     IntervalClosedType,
-    np_ndarray_bool,
 )
 
 from pandas.core.dtypes.dtypes import DatetimeTZDtype
@@ -29,7 +31,6 @@ from pandas.core.dtypes.dtypes import DatetimeTZDtype
 from pandas.tseries.offsets import BaseOffset
 
 class DatetimeIndex(DatetimeTimedeltaMixin, DatetimeIndexProperties):
-    tz: tzinfo | None
     def __init__(
         self,
         data: ArrayLike | AnyArrayLike | list | tuple,
@@ -79,10 +80,6 @@ class DatetimeIndex(DatetimeTimedeltaMixin, DatetimeIndexProperties):
     def isocalendar(self) -> DataFrame: ...
     @property
     def tzinfo(self) -> tzinfo | None: ...
-    def __lt__(self, other: Timestamp) -> np_ndarray_bool: ...
-    def __le__(self, other: Timestamp) -> np_ndarray_bool: ...
-    def __gt__(self, other: Timestamp) -> np_ndarray_bool: ...
-    def __ge__(self, other: Timestamp) -> np_ndarray_bool: ...
     @property
     def dtype(self) -> np.dtype | DatetimeTZDtype: ...
 
@@ -90,7 +87,7 @@ def date_range(
     start: str | DatetimeLike | None = ...,
     end: str | DatetimeLike | None = ...,
     periods: int | None = ...,
-    freq: str | BaseOffset = ...,
+    freq: str | timedelta | Timedelta | BaseOffset = ...,
     tz: str | tzinfo = ...,
     normalize: bool = ...,
     name: str | None = ...,
@@ -101,7 +98,7 @@ def bdate_range(
     start: str | DatetimeLike | None = ...,
     end: str | DatetimeLike | None = ...,
     periods: int | None = ...,
-    freq: str | BaseOffset = ...,
+    freq: str | timedelta | Timedelta | BaseOffset = ...,
     tz: str | tzinfo = ...,
     normalize: bool = ...,
     name: str | None = ...,
