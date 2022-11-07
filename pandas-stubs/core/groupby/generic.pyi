@@ -15,7 +15,6 @@ from matplotlib.axes import (
     Axes as PlotAxes,
     SubplotBase as AxesSubplot,
 )
-import numpy as np
 from pandas.core.frame import DataFrame
 from pandas.core.generic import NDFrame
 from pandas.core.groupby.groupby import (  # , get_groupby as get_groupby
@@ -23,6 +22,7 @@ from pandas.core.groupby.groupby import (  # , get_groupby as get_groupby
 )
 from pandas.core.groupby.grouper import Grouper
 from pandas.core.series import Series
+from typing_extensions import TypeAlias
 
 from pandas._typing import (
     S1,
@@ -34,7 +34,7 @@ from pandas._typing import (
     Scalar,
 )
 
-AggScalar = Union[str, Callable[..., Any]]
+AggScalar: TypeAlias = Union[str, Callable[..., Any]]
 ScalarResult = ...
 
 class NamedAgg(NamedTuple):
@@ -141,15 +141,15 @@ class _DataFrameGroupByNonScalar(DataFrameGroupBy):
 class DataFrameGroupBy(GroupBy):
     def any(self, skipna: bool = ...) -> DataFrame: ...
     def all(self, skipna: bool = ...) -> DataFrame: ...
+    # error: Overload 3 for "apply" will never be used because its parameters overlap overload 1
     @overload
-    def apply(
+    def apply(  # type: ignore[misc]
         self, func: Callable[[DataFrame], Scalar | list | dict], *args, **kwargs
     ) -> Series: ...
     @overload
     def apply(
         self, func: Callable[[DataFrame], Series | DataFrame], *args, **kwargs
     ) -> DataFrame: ...
-    # error: Overload 3 for "apply" will never be used because its parameters overlap overload 1
     @overload
     def apply(  # pyright: ignore[reportOverlappingOverload]
         self, func: Callable[[Iterable], float], *args, **kwargs

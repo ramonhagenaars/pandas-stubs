@@ -8,15 +8,15 @@ from typing import (
     overload,
 )
 
-import numpy as np
-import numpy.typing as npt
-import pandas as pd
 from pandas.core.frame import DataFrame
 
 from pandas._typing import (
     CompressionOptions,
     FilePath,
     HashableT,
+    HashableT1,
+    HashableT2,
+    HashableT3,
     ReadBuffer,
     StataDateFormat,
     StorageOptions,
@@ -123,15 +123,15 @@ class StataWriter(StataParser):
         self,
         fname: FilePath | WriteBuffer[bytes],
         data: DataFrame,
-        convert_dates: dict[HashableT, StataDateFormat] | None = ...,
+        convert_dates: dict[HashableT1, StataDateFormat] | None = ...,
         write_index: bool = ...,
         byteorder: str | None = ...,
         time_stamp: datetime.datetime | None = ...,
         data_label: str | None = ...,
-        variable_labels: dict[HashableT, str] | None = ...,
+        variable_labels: dict[HashableT2, str] | None = ...,
         compression: CompressionOptions = ...,
         storage_options: StorageOptions = ...,
         *,
-        value_labels: dict[HashableT, dict[float, str]] | None = ...,
+        value_labels: dict[HashableT3, dict[float, str]] | None = ...,
     ) -> None: ...
     def write_file(self) -> None: ...

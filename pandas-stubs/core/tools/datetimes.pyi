@@ -1,7 +1,10 @@
-from datetime import datetime
+from datetime import (
+    date,
+    datetime,
+)
 from typing import (
     Literal,
-    TypedDict,
+    Sequence,
     Union,
     overload,
 )
@@ -12,49 +15,29 @@ from pandas import (
     Timestamp,
 )
 from pandas.core.arrays import ExtensionArray
-from pandas.core.frame import DataFrame
 from pandas.core.indexes.datetimes import DatetimeIndex
 from pandas.core.series import (
     Series,
     TimestampSeries,
 )
+from typing_extensions import TypeAlias
 
 from pandas._libs.tslibs import NaTType
 from pandas._typing import (
     AnyArrayLike,
-    DateTimeErrorChoices,
+    DictConvertible,
     IgnoreRaise,
+    IgnoreRaiseCoerce,
+    TimestampConvertibleTypes,
+    npt,
 )
 
-ArrayConvertible = Union[list, tuple, AnyArrayLike]
-Scalar = Union[float, str]
-DatetimeScalar = Union[Scalar, datetime, np.datetime64]
+ArrayConvertible: TypeAlias = Union[list, tuple, AnyArrayLike]
+Scalar: TypeAlias = Union[float, str]
+DatetimeScalar: TypeAlias = Union[Scalar, datetime, np.datetime64, date]
 
-DatetimeScalarOrArrayConvertible = Union[DatetimeScalar, ArrayConvertible]
+DatetimeScalarOrArrayConvertible: TypeAlias = Union[DatetimeScalar, ArrayConvertible]
 
-DatetimeDictArg = Union[list[Scalar], tuple[Scalar, ...], AnyArrayLike]
-
-class YearMonthDayDict(TypedDict, total=True):
-    year: DatetimeDictArg
-    month: DatetimeDictArg
-    day: DatetimeDictArg
-
-class FulldatetimeDict(YearMonthDayDict, total=False):
-    hour: DatetimeDictArg
-    hours: DatetimeDictArg
-    minute: DatetimeDictArg
-    minutes: DatetimeDictArg
-    second: DatetimeDictArg
-    seconds: DatetimeDictArg
-    ms: DatetimeDictArg
-    us: DatetimeDictArg
-    ns: DatetimeDictArg
-
-DictConvertible = Union[FulldatetimeDict, DataFrame]
-
-def should_cache(
-    arg: ArrayConvertible, unique_share: float = ..., check_count: int | None = ...
-) -> bool: ...
 @overload
 def to_datetime(
     arg: DatetimeScalar,
@@ -66,7 +49,7 @@ def to_datetime(
     exact: bool = ...,
     unit: str | None = ...,
     infer_datetime_format: bool = ...,
-    origin=...,
+    origin: Literal["julian", "unix"] | TimestampConvertibleTypes = ...,
     cache: bool = ...,
 ) -> Timestamp: ...
 @overload
@@ -80,13 +63,13 @@ def to_datetime(
     exact: bool = ...,
     unit: str | None = ...,
     infer_datetime_format: bool = ...,
-    origin=...,
+    origin: Literal["julian", "unix"] | TimestampConvertibleTypes = ...,
     cache: bool = ...,
 ) -> Timestamp | NaTType: ...
 @overload
 def to_datetime(
     arg: Series | DictConvertible,
-    errors: DateTimeErrorChoices = ...,
+    errors: IgnoreRaiseCoerce = ...,
     dayfirst: bool = ...,
     yearfirst: bool = ...,
     utc: bool | None = ...,
@@ -94,13 +77,20 @@ def to_datetime(
     exact: bool = ...,
     unit: str | None = ...,
     infer_datetime_format: bool = ...,
-    origin=...,
+    origin: Literal["julian", "unix"] | TimestampConvertibleTypes = ...,
     cache: bool = ...,
 ) -> TimestampSeries: ...
 @overload
 def to_datetime(
-    arg: list | tuple | np.ndarray | Index | ExtensionArray,
-    errors: DateTimeErrorChoices = ...,
+    arg: Sequence[int | float | datetime]
+    | list[str]
+    | tuple[int | float | str | datetime, ...]
+    | npt.NDArray[np.datetime64]
+    | npt.NDArray[np.str_]
+    | npt.NDArray[np.int_]
+    | Index
+    | ExtensionArray,
+    errors: IgnoreRaiseCoerce = ...,
     dayfirst: bool = ...,
     yearfirst: bool = ...,
     utc: bool | None = ...,
@@ -108,7 +98,6 @@ def to_datetime(
     exact: bool = ...,
     unit: str | None = ...,
     infer_datetime_format: bool = ...,
-    origin=...,
+    origin: Literal["julian", "unix"] | TimestampConvertibleTypes = ...,
     cache: bool = ...,
 ) -> DatetimeIndex: ...
-def to_time(arg, format=..., infer_time_format: bool = ..., errors: str = ...): ...

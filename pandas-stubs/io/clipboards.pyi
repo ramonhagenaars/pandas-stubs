@@ -1,3 +1,4 @@
+from collections import defaultdict
 import csv
 from typing import (
     Any,
@@ -7,7 +8,6 @@ from typing import (
     overload,
 )
 
-import numpy as np
 from pandas.core.frame import DataFrame
 from pandas.core.indexes.base import Index
 from pandas.core.series import Series
@@ -38,7 +38,7 @@ def read_clipboard(
     | npt.NDArray
     | Callable[[str], bool]
     | None = ...,
-    dtype: DtypeArg | None = ...,
+    dtype: DtypeArg | defaultdict | None = ...,
     engine: CSVEngine | None = ...,
     converters: dict[int | str, Callable[[str], Any]] = ...,
     true_values: list[str] = ...,
@@ -101,7 +101,7 @@ def read_clipboard(
     | npt.NDArray
     | Callable[[str], bool]
     | None = ...,
-    dtype: DtypeArg | None = ...,
+    dtype: DtypeArg | defaultdict | None = ...,
     engine: CSVEngine | None = ...,
     converters: dict[int | str, Callable[[str], Any]] = ...,
     true_values: list[str] = ...,
@@ -164,7 +164,7 @@ def read_clipboard(
     | npt.NDArray
     | Callable[[str], bool]
     | None = ...,
-    dtype: DtypeArg | None = ...,
+    dtype: DtypeArg | defaultdict | None = ...,
     engine: CSVEngine | None = ...,
     converters: dict[int | str, Callable[[str], Any]] = ...,
     true_values: list[str] = ...,

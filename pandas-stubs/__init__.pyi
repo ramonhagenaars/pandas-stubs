@@ -6,6 +6,7 @@ from . import (
     plotting as plotting,
     testing as testing,
     tseries as tseries,
+    util as util,
 )
 from ._config import (
     describe_option as describe_option,
@@ -17,6 +18,7 @@ from ._config import (
 )
 from .core.api import (
     NA as NA,
+    ArrowDtype as ArrowDtype,
     BooleanDtype as BooleanDtype,
     Categorical as Categorical,
     CategoricalDtype as CategoricalDtype,

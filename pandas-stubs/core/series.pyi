@@ -48,6 +48,7 @@ from pandas.core.indexes.timedeltas import TimedeltaIndex
 from pandas.core.indexing import (
     _AtIndexer,
     _iAtIndexer,
+    _IndexSliceTuple,
 )
 from pandas.core.resample import Resampler
 from pandas.core.strings import StringMethods
@@ -60,6 +61,7 @@ from pandas.core.window.rolling import (
     Rolling,
     Window,
 )
+from typing_extensions import TypeAlias
 import xarray as xr
 
 from pandas._libs.missing import NAType
@@ -76,17 +78,20 @@ from pandas._typing import (
     CalculationMethod,
     CompressionOptions,
     DtypeObj,
-    FilePathOrBuffer,
+    FilePath,
     FillnaOptions,
     GroupByObjectNonScalar,
-    HashableT,
+    HashableT1,
+    HashableT2,
+    HashableT3,
     IgnoreRaise,
     IndexingInt,
+    IntervalClosedType,
+    JoinHow,
     JsonSeriesOrient,
     Level,
     ListLike,
     MaskType,
-    MergeHow,
     NaPosition,
     QuantileInterpolation,
     Renamer,
@@ -95,7 +100,9 @@ from pandas._typing import (
     SeriesAxisType,
     SortKind,
     TimestampConvention,
+    WriteBuffer,
     np_ndarray_anyint,
+    np_ndarray_bool,
     npt,
     num,
 )
@@ -129,21 +136,21 @@ class _iLocIndexerSeries(_iLocIndexer, Generic[S1]):
     ) -> None: ...
 
 class _LocIndexerSeries(_LocIndexer, Generic[S1]):
+    # ignore needed because of mypy.  Overlapping, but we want to distinguish
+    # having a tuple of just scalars, versus tuples that include slices or Index
     @overload
-    def __getitem__(
+    def __getitem__(  # type: ignore[misc]
         self,
-        idx: MaskType
-        | Index
-        | Sequence[float]
-        | list[str]
-        | slice
-        | tuple[str | float | slice | Index, ...],
-    ) -> Series[S1]: ...
-    @overload
-    def __getitem__(
-        self,
-        idx: str | float,
+        idx: Scalar | tuple[Scalar, ...],
+        # tuple case is for getting a specific element when using a MultiIndex
     ) -> S1: ...
+    @overload
+    def __getitem__(
+        self,
+        idx: MaskType | Index | Sequence[float] | list[str] | slice | _IndexSliceTuple,
+        # _IndexSliceTuple is when having a tuple that includes a slice.  Could just
+        # be s.loc[1, :], or s.loc[pd.IndexSlice[1, :]]
+    ) -> Series[S1]: ...
     @overload
     def __setitem__(
         self,
@@ -165,7 +172,7 @@ class _LocIndexerSeries(_LocIndexer, Generic[S1]):
 
 class Series(IndexOpsMixin, NDFrame, Generic[S1]):
 
-    _ListLike = Union[ArrayLike, dict[_str, np.ndarray], list, tuple, Index]
+    _ListLike: TypeAlias = Union[ArrayLike, dict[_str, np.ndarray], list, tuple, Index]
     __hash__: ClassVar[None]
 
     @overload
@@ -187,7 +194,17 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
         name: Hashable | None = ...,
         copy: bool = ...,
         fastpath: bool = ...,
-    ) -> Series[Period]: ...
+    ) -> PeriodSeries: ...
+    @overload
+    def __new__(
+        cls,
+        data: TimedeltaIndex,
+        index: Axes | None = ...,
+        dtype=...,
+        name: Hashable | None = ...,
+        copy: bool = ...,
+        fastpath: bool = ...,
+    ) -> TimedeltaSeries: ...
     @overload
     def __new__(
         cls,
@@ -337,7 +354,7 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     @overload
     def to_string(
         self,
-        buf: FilePathOrBuffer | None,
+        buf: FilePath | WriteBuffer[str],
         na_rep: _str = ...,
         formatters=...,
         float_format=...,
@@ -356,6 +373,7 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     @overload
     def to_string(
         self,
+        buf: None = ...,
         na_rep: _str = ...,
         formatters=...,
         float_format=...,
@@ -374,7 +392,7 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     @overload
     def to_json(
         self,
-        path_or_buf: FilePathOrBuffer | None,
+        path_or_buf: FilePath | WriteBuffer[str],
         orient: JsonSeriesOrient | None = ...,
         date_format: Literal["epoch", "iso"] | None = ...,
         double_precision: int = ...,
@@ -390,6 +408,7 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     @overload
     def to_json(
         self,
+        path_or_buf: None = ...,
         orient: JsonSeriesOrient | None = ...,
         date_format: Literal["epoch", "iso"] | None = ...,
         double_precision: int = ...,
@@ -663,13 +682,26 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
         *args,
         **kwargs,
     ) -> DataFrame: ...
+    @overload
     def apply(
-        self, func: Callable, convertDType: _bool = ..., args: tuple = ..., **kwds
-    ) -> Series | DataFrame: ...
+        self,
+        func: Callable[..., Scalar | Sequence | Mapping],
+        convertDType: _bool = ...,
+        args: tuple = ...,
+        **kwds,
+    ) -> Series: ...
+    @overload
+    def apply(
+        self,
+        func: Callable[..., Series],
+        convertDType: _bool = ...,
+        args: tuple = ...,
+        **kwds,
+    ) -> DataFrame: ...
     def align(
         self,
         other: DataFrame | Series,
-        join: MergeHow = ...,
+        join: JoinHow = ...,
         axis: AxisType | None = ...,
         level: Level | None = ...,
         copy: _bool = ...,
@@ -734,11 +766,11 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     @overload
     def drop(
         self,
-        labels: Hashable | list[HashableT] | Index = ...,
+        labels: Hashable | list[HashableT1] | Index = ...,
         *,
         axis: Axis = ...,
-        index: Hashable | list[HashableT] | Index = ...,
-        columns: Hashable | list[HashableT] | Index = ...,
+        index: Hashable | list[HashableT2] | Index = ...,
+        columns: Hashable | list[HashableT3] | Index = ...,
         level: Level | None = ...,
         inplace: Literal[True],
         errors: IgnoreRaise = ...,
@@ -746,11 +778,11 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     @overload
     def drop(
         self,
-        labels: Hashable | list[HashableT] | Index = ...,
+        labels: Hashable | list[HashableT1] | Index = ...,
         *,
         axis: Axis = ...,
-        index: Hashable | list[HashableT] | Index = ...,
-        columns: Hashable | list[HashableT] | Index = ...,
+        index: Hashable | list[HashableT2] | Index = ...,
+        columns: Hashable | list[HashableT3] | Index = ...,
         level: Level | None = ...,
         inplace: Literal[False] = ...,
         errors: IgnoreRaise = ...,
@@ -758,11 +790,11 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     @overload
     def drop(
         self,
-        labels: Hashable | list[HashableT] | Index = ...,
+        labels: Hashable | list[HashableT1] | Index = ...,
         *,
         axis: Axis = ...,
-        index: Hashable | list[HashableT] | Index = ...,
-        columns: Hashable | list[HashableT] | Index = ...,
+        index: Hashable | list[HashableT2] | Index = ...,
+        columns: Hashable | list[HashableT3] | Index = ...,
         level: Level | None = ...,
         inplace: bool = ...,
         errors: IgnoreRaise = ...,
@@ -1161,7 +1193,7 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
         ascending: _bool = ...,
         bins: int | None = ...,
         dropna: _bool = ...,
-    ) -> Series[S1]: ...
+    ) -> Series[int]: ...
     def transpose(self, *args, **kwargs) -> Series[S1]: ...
     @property
     def T(self) -> Series[S1]: ...
@@ -1180,7 +1212,15 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     def __add__(
         self, other: num | _str | Timedelta | _ListLike | Series[S1]
     ) -> Series: ...
-    def __and__(self, other: _ListLike | Series[S1]) -> Series[_bool]: ...
+    # ignore needed for mypy as we want different results based on the arguments
+    @overload
+    def __and__(  # type: ignore[misc]
+        self, other: bool | list[bool] | np_ndarray_bool | Series[bool]
+    ) -> Series[bool]: ...
+    @overload
+    def __and__(
+        self, other: int | list[int] | np_ndarray_anyint | Series[int]
+    ) -> Series[int]: ...
     # def __array__(self, dtype: Optional[_bool] = ...) -> _np_ndarray
     def __div__(self, other: num | _ListLike | Series[S1]) -> Series[S1]: ...
     def __eq__(self, other: object) -> Series[_bool]: ...  # type: ignore[override]
@@ -1208,9 +1248,25 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     def __mod__(self, other: num | _ListLike | Series[S1]) -> Series[S1]: ...
     def __ne__(self, other: object) -> Series[_bool]: ...  # type: ignore[override]
     def __pow__(self, other: num | _ListLike | Series[S1]) -> Series[S1]: ...
-    def __or__(self, other: _ListLike | Series[S1]) -> Series[_bool]: ...
+    # ignore needed for mypy as we want different results based on the arguments
+    @overload
+    def __or__(  # type: ignore[misc]
+        self, other: bool | list[bool] | np_ndarray_bool | Series[bool]
+    ) -> Series[bool]: ...
+    @overload
+    def __or__(
+        self, other: int | list[int] | np_ndarray_anyint | Series[int]
+    ) -> Series[int]: ...
     def __radd__(self, other: num | _str | _ListLike | Series[S1]) -> Series[S1]: ...
-    def __rand__(self, other: num | _ListLike | Series[S1]) -> Series[_bool]: ...
+    # ignore needed for mypy as we want different results based on the arguments
+    @overload
+    def __rand__(  # type: ignore[misc]
+        self, other: bool | list[bool] | np_ndarray_bool | Series[bool]
+    ) -> Series[bool]: ...
+    @overload
+    def __rand__(
+        self, other: int | list[int] | np_ndarray_anyint | Series[int]
+    ) -> Series[int]: ...
     def __rdiv__(self, other: num | _ListLike | Series[S1]) -> Series[S1]: ...
     def __rdivmod__(self, other: num | _ListLike | Series[S1]) -> Series[S1]: ...
     def __rfloordiv__(self, other: num | _ListLike | Series[S1]) -> Series[S1]: ...
@@ -1218,21 +1274,41 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     def __rmul__(self, other: num | _ListLike | Series) -> Series: ...
     def __rnatmul__(self, other: num | _ListLike | Series[S1]) -> Series[S1]: ...
     def __rpow__(self, other: num | _ListLike | Series[S1]) -> Series[S1]: ...
-    def __ror__(self, other: num | _ListLike | Series[S1]) -> Series[_bool]: ...
+    # ignore needed for mypy as we want different results based on the arguments
+    @overload
+    def __ror__(  # type: ignore[misc]
+        self, other: bool | list[bool] | np_ndarray_bool | Series[bool]
+    ) -> Series[bool]: ...
+    @overload
+    def __ror__(
+        self, other: int | list[int] | np_ndarray_anyint | Series[int]
+    ) -> Series[int]: ...
     def __rsub__(self, other: num | _ListLike | Series[S1]) -> Series: ...
     @overload
-    def __rtruediv__(self, other: Timedelta | TimedeltaSeries) -> Series[float]: ...
+    def __rtruediv__(self, other: TimedeltaSeries) -> Series[float]: ...
     @overload
     def __rtruediv__(self, other: num | _ListLike | Series[S1]) -> Series: ...
-    def __rxor__(self, other: num | _ListLike | Series[S1]) -> Series[_bool]: ...
+    # ignore needed for mypy as we want different results based on the arguments
+    @overload
+    def __rxor__(  # type: ignore[misc]
+        self, other: bool | list[bool] | np_ndarray_bool | Series[bool]
+    ) -> Series[bool]: ...
+    @overload
+    def __rxor__(
+        self, other: int | list[int] | np_ndarray_anyint | Series[int]
+    ) -> Series[int]: ...
     @overload
     def __sub__(
         self, other: Timestamp | datetime | TimestampSeries
     ) -> TimedeltaSeries: ...
     @overload
     def __sub__(
-        self, other: Timedelta | TimedeltaSeries | TimedeltaIndex
+        self: Series[Timestamp], other: Timedelta | TimedeltaSeries | TimedeltaIndex
     ) -> TimestampSeries: ...
+    @overload
+    def __sub__(
+        self: Series[Timedelta], other: Timedelta | TimedeltaSeries | TimedeltaIndex
+    ) -> TimedeltaSeries: ...
     @overload
     def __sub__(self, other: num | _ListLike | Series) -> Series: ...
     @overload
@@ -1241,7 +1317,15 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     ) -> Series[float]: ...
     @overload
     def __truediv__(self, other: num | _ListLike | Series[S1]) -> Series: ...
-    def __xor__(self, other: _ListLike | Series[S1]) -> Series: ...
+    # ignore needed for mypy as we want different results based on the arguments
+    @overload
+    def __xor__(  # type: ignore[misc]
+        self, other: bool | list[bool] | np_ndarray_bool | Series[bool]
+    ) -> Series[bool]: ...
+    @overload
+    def __xor__(
+        self, other: int | list[int] | np_ndarray_anyint | Series[int]
+    ) -> Series[int]: ...
     def __invert__(self) -> Series[bool]: ...
     # properties
     # @property
@@ -1505,28 +1589,28 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     @overload
     def rolling(
         self,
-        window: int | BaseOffset | BaseIndexer,
+        window: int | _str | BaseOffset | BaseIndexer,
         min_periods: int | None = ...,
         center: _bool = ...,
         *,
         win_type: _str,
         on: _str | None = ...,
         axis: SeriesAxisType = ...,
-        closed: _str | None = ...,
+        closed: IntervalClosedType | None = ...,
         step: int | None = ...,
         method: CalculationMethod = ...,
     ) -> Window[Series]: ...
     @overload
     def rolling(
         self,
-        window: int | BaseOffset | BaseIndexer,
+        window: int | _str | BaseOffset | BaseIndexer,
         min_periods: int | None = ...,
         center: _bool = ...,
         *,
         win_type: None = ...,
         on: _str | None = ...,
         axis: SeriesAxisType = ...,
-        closed: _str | None = ...,
+        closed: IntervalClosedType | None = ...,
         step: int | None = ...,
         method: CalculationMethod = ...,
     ) -> Rolling[Series]: ...
@@ -1657,6 +1741,12 @@ class TimestampSeries(Series[Timestamp]):
 
 class TimedeltaSeries(Series[Timedelta]):
     # ignores needed because of mypy
+    @overload  # type: ignore[override]
+    def __add__(self, other: Period) -> PeriodSeries: ...
+    @overload
+    def __add__(self, other: Timestamp | DatetimeIndex) -> TimestampSeries: ...
+    @overload
+    def __add__(self, other: Timedelta) -> TimedeltaSeries: ...
     def __radd__(self, pther: Timestamp | TimestampSeries) -> TimestampSeries: ...  # type: ignore[override]
     def __mul__(self, other: num) -> TimedeltaSeries: ...  # type: ignore[override]
     def __sub__(  # type: ignore[override]
@@ -1669,3 +1759,10 @@ class PeriodSeries(Series[Period]):
     # ignore needed because of mypy
     @property
     def dt(self) -> PeriodProperties: ...  # type: ignore[override]
+    def __sub__(self, other: PeriodSeries) -> OffsetSeries: ...  # type: ignore[override]
+
+class OffsetSeries(Series):
+    @overload  # type: ignore[override]
+    def __radd__(self, other: Period) -> PeriodSeries: ...
+    @overload
+    def __radd__(self, other: BaseOffset) -> OffsetSeries: ...

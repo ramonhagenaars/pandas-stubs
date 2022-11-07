@@ -1,3 +1,4 @@
+from collections import defaultdict
 import csv
 import io
 import os.path
@@ -208,6 +209,10 @@ def test_clipboard():
     check(assert_type(read_clipboard(), DataFrame), DataFrame)
     check(assert_type(read_clipboard(iterator=False), DataFrame), DataFrame)
     check(assert_type(read_clipboard(chunksize=None), DataFrame), DataFrame)
+    check(
+        assert_type(read_clipboard(dtype=defaultdict(lambda: "f8")), DataFrame),
+        DataFrame,
+    )
 
 
 def test_clipboard_iterator():
@@ -425,6 +430,10 @@ def test_read_csv():
             check(assert_type(read_csv(sio), DataFrame), DataFrame)
         check(assert_type(read_csv(path, iterator=False), DataFrame), DataFrame)
         check(assert_type(read_csv(path, chunksize=None), DataFrame), DataFrame)
+        check(
+            assert_type(read_csv(path, dtype=defaultdict(lambda: "f8")), DataFrame),
+            DataFrame,
+        )
 
 
 def test_read_csv_iterator():
@@ -469,6 +478,7 @@ def test_types_read_csv() -> None:
         df11: pd.DataFrame = pd.read_csv(path, usecols=np.array([0]))
         df12: pd.DataFrame = pd.read_csv(path, usecols=("col1",))
         df13: pd.DataFrame = pd.read_csv(path, usecols=pd.Series(data=["col1"]))
+        df14: pd.DataFrame = pd.read_csv(path, converters=None)
 
         tfr1: TextFileReader = pd.read_csv(path, nrows=2, iterator=True, chunksize=3)
         tfr1.close()
@@ -489,6 +499,10 @@ def test_read_table():
         check(assert_type(read_table(path), DataFrame), DataFrame)
         check(assert_type(read_table(path, iterator=False), DataFrame), DataFrame)
         check(assert_type(read_table(path, chunksize=None), DataFrame), DataFrame)
+        check(
+            assert_type(read_table(path, dtype=defaultdict(lambda: "f8")), DataFrame),
+            DataFrame,
+        )
 
 
 def test_read_table_iterator():
@@ -500,6 +514,15 @@ def test_read_table_iterator():
         tfr2 = read_table(path, chunksize=1)
         check(assert_type(tfr2, TextFileReader), TextFileReader)
         tfr2.close()
+
+
+def test_types_read_table():
+    df = pd.DataFrame(data={"col1": [1, 2], "col2": [3, 4]})
+
+    with ensure_clean() as path:
+        df.to_csv(path)
+
+        df2: pd.DataFrame = pd.read_table(path, sep=",", converters=None)
 
 
 def btest_read_fwf():
@@ -657,6 +680,14 @@ def test_excel_writer():
             dict,
         )
         check(assert_type(ef.close(), None), type(None))
+
+
+def test_excel_writer_append_mode():
+    with ensure_clean(".xlsx") as path:
+        with pd.ExcelWriter(path, mode="w") as ew:
+            DF.to_excel(ew, sheet_name="A")
+        with pd.ExcelWriter(path, mode="a") as ew:
+            pass
 
 
 def test_to_string():

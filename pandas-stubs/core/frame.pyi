@@ -35,6 +35,7 @@ from pandas.core.indexing import (
     _IndexSliceTuple,
     _LocIndexer,
 )
+from pandas.core.interchange.dataframe_protocol import DataFrame as DataFrameXchg
 from pandas.core.resample import Resampler
 from pandas.core.series import Series
 from pandas.core.window import (
@@ -66,17 +67,20 @@ from pandas._typing import (
     CompressionOptions,
     Dtype,
     FilePath,
-    FilePathOrBuffer,
     FillnaOptions,
     FloatFormatType,
     FormattersType,
     GroupByObjectNonScalar,
     HashableT,
+    HashableT1,
+    HashableT2,
+    HashableT3,
     IgnoreRaise,
     IndexingInt,
     IndexLabel,
     IndexType,
     IntervalClosedType,
+    JoinHow,
     JsonFrameOrient,
     Label,
     Level,
@@ -100,6 +104,7 @@ from pandas._typing import (
     Suffixes,
     T as TType,
     TimestampConvention,
+    ValidationOptions,
     WriteBuffer,
     XMLParsers,
     np_ndarray_bool,
@@ -108,7 +113,6 @@ from pandas._typing import (
     num,
 )
 
-from pandas.io.formats import format as fmt
 from pandas.io.formats.style import Styler
 from pandas.plotting import PlotAccessor
 
@@ -190,7 +194,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         data: ListLikeU
         | DataFrame
         | dict[Any, Any]
-        | Iterable[tuple[Hashable, ListLikeU]]
+        | Iterable[ListLikeU | tuple[Hashable, ListLikeU] | dict[Any, Any]]
         | None = ...,
         index: Axes | None = ...,
         columns: Axes | None = ...,
@@ -206,6 +210,9 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         dtype=...,
         copy: _bool = ...,
     ) -> DataFrame: ...
+    def __dataframe__(
+        self, nan_as_null: bool = ..., allow_copy: bool = ...
+    ) -> DataFrameXchg: ...
     @property
     def axes(self) -> list[Index]: ...
     @property
@@ -288,25 +295,25 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         index: _bool = ...,
         column_dtypes: _str
         | npt.DTypeLike
-        | Mapping[HashableT, npt.DTypeLike]
+        | Mapping[HashableT1, npt.DTypeLike]
         | None = ...,
         index_dtypes: _str
         | npt.DTypeLike
-        | Mapping[HashableT, npt.DTypeLike]
+        | Mapping[HashableT2, npt.DTypeLike]
         | None = ...,
     ) -> np.recarray: ...
     def to_stata(
         self,
         path: FilePath | WriteBuffer[bytes],
         *,
-        convert_dates: dict[HashableT, StataDateFormat] | None = ...,
+        convert_dates: dict[HashableT1, StataDateFormat] | None = ...,
         write_index: _bool = ...,
         byteorder: Literal["<", ">", "little", "big"] | None = ...,
         time_stamp: _dt.datetime | None = ...,
         data_label: _str | None = ...,
-        variable_labels: dict[HashableT, str] | None = ...,
+        variable_labels: dict[HashableT2, str] | None = ...,
         version: Literal[114, 117, 118, 119] | None = ...,
-        convert_strl: list[HashableT] | None = ...,
+        convert_strl: list[HashableT3] | None = ...,
         compression: CompressionOptions = ...,
         storage_options: StorageOptions = ...,
         value_labels: dict[Hashable, dict[float, str]] | None = ...,
@@ -446,8 +453,8 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         root_name: str = ...,
         row_name: str = ...,
         na_rep: str | None = ...,
-        attr_cols: list[HashableT] | None = ...,
-        elem_cols: list[HashableT] | None = ...,
+        attr_cols: list[HashableT1] | None = ...,
+        elem_cols: list[HashableT2] | None = ...,
         namespaces: dict[str | None, str] | None = ...,
         prefix: str | None = ...,
         encoding: str = ...,
@@ -466,8 +473,8 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         root_name: str | None = ...,
         row_name: str | None = ...,
         na_rep: str | None = ...,
-        attr_cols: list[HashableT] | None = ...,
-        elem_cols: list[HashableT] | None = ...,
+        attr_cols: list[HashableT1] | None = ...,
+        elem_cols: list[HashableT2] | None = ...,
         namespaces: dict[str | None, str] | None = ...,
         prefix: str | None = ...,
         encoding: str = ...,
@@ -531,7 +538,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     def align(
         self,
         other: DataFrame | Series,
-        join: MergeHow = ...,
+        join: JoinHow = ...,
         axis: AxisType | None = ...,
         level: Level | None = ...,
         copy: _bool = ...,
@@ -1083,14 +1090,32 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         **kwargs,
     ) -> DataFrame: ...
     @overload
-    def apply(self, f: Callable) -> Series: ...
+    def apply(
+        self,
+        f: Callable[..., Series],
+        axis: AxisType = ...,
+        raw: _bool = ...,
+        result_type: Literal["expand", "reduce", "broadcast"] | None = ...,
+        args=...,
+        **kwargs,
+    ) -> DataFrame: ...
     @overload
     def apply(
         self,
-        f: Callable,
-        axis: AxisType,
+        f: Callable[..., Scalar],
+        axis: AxisType = ...,
         raw: _bool = ...,
-        result_type: _str | None = ...,
+        result_type: Literal["expand", "reduce"] | None = ...,
+        args=...,
+        **kwargs,
+    ) -> Series: ...
+    @overload
+    def apply(
+        self,
+        f: Callable[..., Scalar],
+        result_type: Literal["broadcast"],
+        axis: AxisType = ...,
+        raw: _bool = ...,
         args=...,
         **kwargs,
     ) -> DataFrame: ...
@@ -1101,21 +1126,11 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         self,
         other: DataFrame | Series | list[DataFrame | Series],
         on: _str | list[_str] | None = ...,
-        how: MergeHow = ...,
+        how: JoinHow = ...,
         lsuffix: _str = ...,
         rsuffix: _str = ...,
         sort: _bool = ...,
-        validate: Literal[
-            "one_to_one",
-            "1:1",
-            "one_to_many",
-            "1:m",
-            "many_to_one",
-            "m:1",
-            "many_to_many",
-            "m:m",
-        ]
-        | None = ...,
+        validate: ValidationOptions | None = ...,
     ) -> DataFrame: ...
     def merge(
         self,
@@ -1781,7 +1796,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     @overload
     def rolling(
         self,
-        window: int | BaseOffset | BaseIndexer,
+        window: int | str | BaseOffset | BaseIndexer,
         min_periods: int | None = ...,
         center: _bool = ...,
         *,
@@ -1795,7 +1810,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     @overload
     def rolling(
         self,
-        window: int | BaseOffset | BaseIndexer,
+        window: int | str | BaseOffset | BaseIndexer,
         min_periods: int | None = ...,
         center: _bool = ...,
         *,
@@ -1911,7 +1926,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     @overload
     def to_json(
         self,
-        path_or_buf: FilePathOrBuffer | None,
+        path_or_buf: FilePath | WriteBuffer[str],
         orient: JsonFrameOrient | None = ...,
         date_format: Literal["epoch", "iso"] | None = ...,
         double_precision: int = ...,
@@ -1927,6 +1942,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     @overload
     def to_json(
         self,
+        path_or_buf: None = ...,
         orient: JsonFrameOrient | None = ...,
         date_format: Literal["epoch", "iso"] | None = ...,
         double_precision: int = ...,
@@ -1943,8 +1959,8 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     def to_string(
         self,
         buf: FilePath | WriteBuffer[str],
-        columns: list[HashableT] | Index | Series | None = ...,
-        col_space: int | list[int] | dict[HashableT, int] | None = ...,
+        columns: list[HashableT1] | Index | Series | None = ...,
+        col_space: int | list[int] | dict[HashableT2, int] | None = ...,
         header: _bool | list[_str] | tuple[str, ...] = ...,
         index: _bool = ...,
         na_rep: _str = ...,

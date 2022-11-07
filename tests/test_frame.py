@@ -4,6 +4,7 @@ from collections import defaultdict
 import csv
 import datetime
 import io
+import itertools
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -48,6 +49,9 @@ DF = pd.DataFrame(data={"col1": [1, 2], "col2": [3, 4]})
 def test_types_init() -> None:
     pd.DataFrame(data={"col1": [1, 2], "col2": [3, 4]})
     pd.DataFrame(data={"col1": [1, 2], "col2": [3, 4]}, index=[2, 1])
+    pd.DataFrame(data=[[1, 2, 3], [4, 5, 6]])
+    pd.DataFrame(data=itertools.repeat([1, 2, 3], 3))
+    pd.DataFrame(data=(range(i) for i in range(5)))
     pd.DataFrame(data=[1, 2, 3, 4], dtype=np.int8)
     pd.DataFrame(
         np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]]),
@@ -456,9 +460,28 @@ def test_types_unique() -> None:
 
 def test_types_apply() -> None:
     df = pd.DataFrame(data={"col1": [2, 1], "col2": [3, 4]})
-    df.apply(lambda x: x**2)
-    df.apply(np.exp)
-    df.apply(str)
+
+    def returns_series(x: pd.Series) -> pd.Series:
+        return x**2
+
+    check(assert_type(df.apply(returns_series), pd.DataFrame), pd.DataFrame)
+
+    def returns_scalar(x: pd.Series) -> float:
+        return 2
+
+    check(assert_type(df.apply(returns_scalar), pd.Series), pd.Series)
+    check(
+        assert_type(df.apply(returns_scalar, result_type="broadcast"), pd.DataFrame),
+        pd.DataFrame,
+    )
+    check(assert_type(df.apply(np.exp), pd.DataFrame), pd.DataFrame)
+    check(assert_type(df.apply(str), pd.Series), pd.Series)
+
+    # GH 393
+    def gethead(s: pd.Series, y: int) -> pd.Series:
+        return s.head(y)
+
+    check(assert_type(df.apply(gethead, args=(4,)), pd.DataFrame), pd.DataFrame)
 
 
 def test_types_applymap() -> None:
@@ -639,7 +662,9 @@ def test_types_groupby_methods() -> None:
 
 
 def test_types_groupby_agg() -> None:
-    df = pd.DataFrame(data={"col1": [1, 1, 2], "col2": [3, 4, 5], "col3": [0, 1, 0]})
+    df = pd.DataFrame(
+        data={"col1": [1, 1, 2], "col2": [3, 4, 5], "col3": [0, 1, 0], 0: [-1, -1, -1]}
+    )
     check(assert_type(df.groupby("col1")["col3"].agg(min), pd.Series), pd.Series)
     check(
         assert_type(df.groupby("col1")["col3"].agg([min, max]), pd.DataFrame),
@@ -651,21 +676,28 @@ def test_types_groupby_agg() -> None:
         assert_type(df.groupby("col1").agg(["min", "max"]), pd.DataFrame), pd.DataFrame
     )
     check(assert_type(df.groupby("col1").agg([min, max]), pd.DataFrame), pd.DataFrame)
+    agg_dict1 = {"col2": "min", "col3": "max", 0: "sum"}
+    check(assert_type(df.groupby("col1").agg(agg_dict1), pd.DataFrame), pd.DataFrame)
+    agg_dict2 = {"col2": min, "col3": max, 0: min}
+    check(assert_type(df.groupby("col1").agg(agg_dict2), pd.DataFrame), pd.DataFrame)
+
+    def wrapped_min(x: Any) -> Any:
+        return x.min()
+
+    # Here, MyPy infers dict[object, object], so it must be explicitly annotated
+    agg_dict3: dict[str | int, str | Callable] = {
+        "col2": min,
+        "col3": "max",
+        0: wrapped_min,
+    }
+    check(assert_type(df.groupby("col1").agg(agg_dict3), pd.DataFrame), pd.DataFrame)
+    agg_dict4 = {"col2": "sum"}
+    check(assert_type(df.groupby("col1").agg(agg_dict4), pd.DataFrame), pd.DataFrame)
+    agg_dict5 = {0: "sum"}
+    check(assert_type(df.groupby("col1").agg(agg_dict5), pd.DataFrame), pd.DataFrame)
+    named_agg = pd.NamedAgg(column="col2", aggfunc="max")
     check(
-        assert_type(
-            df.groupby("col1").agg({"col2": "min", "col3": "max"}), pd.DataFrame
-        ),
-        pd.DataFrame,
-    )
-    check(
-        assert_type(df.groupby("col1").agg({"col2": min, "col3": max}), pd.DataFrame),
-        pd.DataFrame,
-    )
-    check(
-        assert_type(
-            df.groupby("col1").agg(new_col=pd.NamedAgg(column="col2", aggfunc="max")),
-            pd.DataFrame,
-        ),
+        assert_type(df.groupby("col1").agg(new_col=named_agg), pd.DataFrame),
         pd.DataFrame,
     )
     # GH#187
@@ -674,6 +706,9 @@ def test_types_groupby_agg() -> None:
 
     cols_opt: list[str | None] = ["col1", "col2"]
     check(assert_type(df.groupby(by=cols_opt).sum(), pd.DataFrame), pd.DataFrame)
+
+    cols_mixed: list[str | int] = ["col1", 0]
+    check(assert_type(df.groupby(by=cols_mixed).sum(), pd.DataFrame), pd.DataFrame)
 
 
 # This was added in 1.1.0 https://pandas.pydata.org/docs/whatsnew/v1.1.0.html
@@ -719,6 +754,7 @@ def test_types_merge() -> None:
     df.merge(df2, on=("col1", "col2"), how="left", suffixes=(None, "s"))
     df.merge(df2, on=("col1", "col2"), how="left", suffixes=("t", "s"))
     df.merge(df2, on=("col1", "col2"), how="left", suffixes=("a", None))
+    df.merge(df2, how="cross")  # GH 289
     columns = ["col1", "col2"]
     df.merge(df2, on=columns)
 
@@ -1879,3 +1915,9 @@ def test_resample_150_changes() -> None:
         return s.mean()
 
     check(assert_type(resampler.apply(f), Union[pd.Series, pd.DataFrame]), pd.DataFrame)
+
+
+def df_accepting_dicts_iterator() -> None:
+    # GH 392
+    data = [{"a": 1, "b": 2}, {"a": 3, "b": 5}]
+    check(assert_type(pd.DataFrame(iter(data)), pd.DataFrame), pd.DataFrame)

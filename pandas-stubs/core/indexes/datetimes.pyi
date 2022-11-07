@@ -2,7 +2,11 @@ from datetime import (
     timedelta,
     tzinfo,
 )
-from typing import overload
+from typing import (
+    Hashable,
+    Sequence,
+    overload,
+)
 
 import numpy as np
 from pandas import (
@@ -22,7 +26,7 @@ from pandas.core.series import (
 from pandas._typing import (
     AnyArrayLike,
     ArrayLike,
-    DatetimeLike,
+    DateAndDatetimeLike,
     IntervalClosedType,
 )
 
@@ -84,26 +88,39 @@ class DatetimeIndex(DatetimeTimedeltaMixin, DatetimeIndexProperties):
     def dtype(self) -> np.dtype | DatetimeTZDtype: ...
 
 def date_range(
-    start: str | DatetimeLike | None = ...,
-    end: str | DatetimeLike | None = ...,
+    start: str | DateAndDatetimeLike | None = ...,
+    end: str | DateAndDatetimeLike | None = ...,
     periods: int | None = ...,
     freq: str | timedelta | Timedelta | BaseOffset = ...,
     tz: str | tzinfo = ...,
     normalize: bool = ...,
-    name: str | None = ...,
+    name: Hashable | None = ...,
     inclusive: IntervalClosedType = ...,
-    **kwargs,
 ) -> DatetimeIndex: ...
+@overload
 def bdate_range(
-    start: str | DatetimeLike | None = ...,
-    end: str | DatetimeLike | None = ...,
+    start: str | DateAndDatetimeLike | None = ...,
+    end: str | DateAndDatetimeLike | None = ...,
     periods: int | None = ...,
     freq: str | timedelta | Timedelta | BaseOffset = ...,
     tz: str | tzinfo = ...,
     normalize: bool = ...,
-    name: str | None = ...,
+    name: Hashable | None = ...,
     weekmask: str | None = ...,
-    holidays: list | None = ...,
+    holidays: None = ...,
     inclusive: IntervalClosedType = ...,
-    **kwargs,
+) -> DatetimeIndex: ...
+@overload
+def bdate_range(
+    start: str | DateAndDatetimeLike | None = ...,
+    end: str | DateAndDatetimeLike | None = ...,
+    periods: int | None = ...,
+    *,
+    freq: str | timedelta | Timedelta | BaseOffset,
+    tz: str | tzinfo = ...,
+    normalize: bool = ...,
+    name: Hashable | None = ...,
+    weekmask: str | None = ...,
+    holidays: Sequence[str | DateAndDatetimeLike],
+    inclusive: IntervalClosedType = ...,
 ) -> DatetimeIndex: ...

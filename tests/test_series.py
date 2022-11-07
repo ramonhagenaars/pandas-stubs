@@ -120,9 +120,12 @@ def test_types_loc_at() -> None:
 
 
 def test_multiindex_loc() -> None:
-    s = pd.Series([1, 2, 3, 4], index=pd.MultiIndex.from_product([[1, 2], ["a", "b"]]))
-    check(assert_type(s.loc[1, :], pd.Series), pd.Series)
-    check(assert_type(s.loc[pd.Index([1]), :], pd.Series), pd.Series)
+    s = pd.Series(
+        [1, 2, 3, 4], index=pd.MultiIndex.from_product([[1, 2], ["a", "b"]]), dtype=int
+    )
+    check(assert_type(s.loc[1, :], "pd.Series[int]"), pd.Series, int)
+    check(assert_type(s.loc[pd.Index([1]), :], "pd.Series[int]"), pd.Series, int)
+    check(assert_type(s.loc[1, "a"], int), np.int_)
 
 
 def test_types_boolean_indexing() -> None:
@@ -364,8 +367,8 @@ def test_types_idxmax() -> None:
 
 
 def test_types_value_counts() -> None:
-    s = pd.Series([1, 2])
-    s.value_counts()
+    s = pd.Series(["a", "b"])
+    check(assert_type(s.value_counts(), "pd.Series[int]"), pd.Series, int)
 
 
 def test_types_unique() -> None:
@@ -374,10 +377,37 @@ def test_types_unique() -> None:
 
 
 def test_types_apply() -> None:
-    s = pd.Series([-10, 2, 2, 3, 10, 10])
-    s.apply(lambda x: x**2)
-    s.apply(np.exp)
-    s.apply(str)
+    s = pd.Series([-10, 2, 2, 3.4, 10, 10])
+
+    def square(x: float) -> float:
+        return x**2
+
+    check(assert_type(s.apply(square), pd.Series), pd.Series, float)
+    check(assert_type(s.apply(np.exp), pd.Series), pd.Series, float)
+    check(assert_type(s.apply(str), pd.Series), pd.Series, str)
+
+    def makeseries(x: float) -> pd.Series:
+        return pd.Series([x, 2 * x])
+
+    check(assert_type(s.apply(makeseries), pd.DataFrame), pd.DataFrame)
+
+    # GH 293
+
+    def retseries(x: float) -> float:
+        return x
+
+    check(assert_type(s.apply(retseries).tolist(), list), list)
+
+    def retlist(x: float) -> list:
+        return [x]
+
+    check(assert_type(s.apply(retlist), pd.Series), pd.Series, list)
+
+    def get_depth(url: str) -> int:
+        return len(url)
+
+    ss = s.astype(str)
+    check(assert_type(ss.apply(get_depth), pd.Series), pd.Series, int)
 
 
 def test_types_element_wise_arithmetic() -> None:
@@ -1211,3 +1241,82 @@ def test_where() -> None:
 
     cond3 = pd.Series([False, True, True])
     check(assert_type(s.where(cond3, other=0), "pd.Series[int]"), pd.Series, int)
+
+
+def test_bitwise_operators() -> None:
+    s = pd.Series([1, 2, 3, 4], dtype=int)
+    s2 = pd.Series([9, 10, 11, 12], dtype=int)
+    # for issue #348 (bitwise operators on Series should support int)
+    check(assert_type(s & 3, "pd.Series[int]"), pd.Series, int)
+    check(assert_type(3 & s, "pd.Series[int]"), pd.Series, int)
+
+    check(assert_type(s | 3, "pd.Series[int]"), pd.Series, int)
+    check(assert_type(3 | s, "pd.Series[int]"), pd.Series, int)
+
+    check(assert_type(s ^ 3, "pd.Series[int]"), pd.Series, int)
+    check(assert_type(3 ^ s, "pd.Series[int]"), pd.Series, int)
+
+    check(assert_type(s & [1, 2, 3, 4], "pd.Series[int]"), pd.Series, int)
+    check(assert_type([1, 2, 3, 4] & s, "pd.Series[int]"), pd.Series, int)
+    check(assert_type(s & s2, "pd.Series[int]"), pd.Series, int)
+    check(assert_type(s2 & s, "pd.Series[int]"), pd.Series, int)
+
+    check(assert_type(s | [1, 2, 3, 4], "pd.Series[int]"), pd.Series, int)
+    check(assert_type([1, 2, 3, 4] | s, "pd.Series[int]"), pd.Series, int)
+    check(assert_type(s | s2, "pd.Series[int]"), pd.Series, int)
+    check(assert_type(s2 | s, "pd.Series[int]"), pd.Series, int)
+
+    check(assert_type(s ^ [1, 2, 3, 4], "pd.Series[int]"), pd.Series, int)
+    check(assert_type([1, 2, 3, 4] ^ s, "pd.Series[int]"), pd.Series, int)
+    check(assert_type(s ^ s2, "pd.Series[int]"), pd.Series, int)
+    check(assert_type(s2 ^ s, "pd.Series[int]"), pd.Series, int)
+
+
+def test_logical_operators() -> None:
+    # GH 380
+    df = pd.DataFrame({"a": [1, 2, 3], "b": [2, 3, 4]})
+    check(
+        assert_type((df["a"] >= 2) & (df["b"] >= 2), "pd.Series[bool]"), pd.Series, bool
+    )
+    check(
+        assert_type((df["a"] >= 2) | (df["b"] >= 2), "pd.Series[bool]"), pd.Series, bool
+    )
+    check(
+        assert_type((df["a"] >= 2) ^ (df["b"] >= 2), "pd.Series[bool]"), pd.Series, bool
+    )
+    check(assert_type((df["a"] >= 2) & True, "pd.Series[bool]"), pd.Series, bool)
+    check(
+        assert_type((df["a"] >= 2) & [True, False, True], "pd.Series[bool]"),
+        pd.Series,
+        bool,
+    )
+    check(assert_type((df["a"] >= 2) | True, "pd.Series[bool]"), pd.Series, bool)
+    check(
+        assert_type((df["a"] >= 2) | [True, False, True], "pd.Series[bool]"),
+        pd.Series,
+        bool,
+    )
+    check(assert_type((df["a"] >= 2) ^ True, "pd.Series[bool]"), pd.Series, bool)
+    check(
+        assert_type((df["a"] >= 2) ^ [True, False, True], "pd.Series[bool]"),
+        pd.Series,
+        bool,
+    )
+    check(assert_type(True & (df["a"] >= 2), "pd.Series[bool]"), pd.Series, bool)
+    check(
+        assert_type([True, False, True] & (df["a"] >= 2), "pd.Series[bool]"),
+        pd.Series,
+        bool,
+    )
+    check(assert_type(True | (df["a"] >= 2), "pd.Series[bool]"), pd.Series, bool)
+    check(
+        assert_type([True, False, True] | (df["a"] >= 2), "pd.Series[bool]"),
+        pd.Series,
+        bool,
+    )
+    check(assert_type(True ^ (df["a"] >= 2), "pd.Series[bool]"), pd.Series, bool)
+    check(
+        assert_type([True, False, True] ^ (df["a"] >= 2), "pd.Series[bool]"),
+        pd.Series,
+        bool,
+    )

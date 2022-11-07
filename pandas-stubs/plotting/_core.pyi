@@ -19,10 +19,14 @@ from pandas import Series
 from pandas.core.base import PandasObject
 from pandas.core.frame import DataFrame
 from scipy.stats.kde import gaussian_kde
+from typing_extensions import TypeAlias
 
 from pandas._typing import (
     ArrayLike,
     HashableT,
+    HashableT1,
+    HashableT2,
+    HashableT3,
     npt,
 )
 
@@ -30,16 +34,18 @@ class _BoxPlotT(NamedTuple):
     ax: Axes
     lines: dict[str, list[Line2D]]
 
-_SingleColor = Union[
+_SingleColor: TypeAlias = Union[
     str, list[float], tuple[float, float, float], tuple[float, float, float, float]
 ]
-_PlotAccessorColor = Union[str, list[_SingleColor], dict[HashableT, _SingleColor]]
+_PlotAccessorColor: TypeAlias = Union[
+    str, list[_SingleColor], dict[HashableT, _SingleColor]
+]
 
 @overload
 def boxplot(
     data: DataFrame,
-    column: Hashable | list[HashableT] | None = ...,
-    by: Hashable | list[HashableT] | None = ...,
+    column: Hashable | list[HashableT1] | None = ...,
+    by: Hashable | list[HashableT2] | None = ...,
     ax: Axes | None = ...,
     fontsize: float | str | None = ...,
     rot: float = ...,
@@ -52,8 +58,8 @@ def boxplot(
 @overload
 def boxplot(
     data: DataFrame,
-    column: Hashable | list[HashableT] | None = ...,
-    by: Hashable | list[HashableT] | None = ...,
+    column: Hashable | list[HashableT1] | None = ...,
+    by: Hashable | list[HashableT2] | None = ...,
     ax: Axes | None = ...,
     fontsize: float | str | None = ...,
     rot: float = ...,
@@ -67,8 +73,8 @@ def boxplot(
 @overload
 def boxplot(
     data: DataFrame,
-    column: Hashable | list[HashableT] | None = ...,
-    by: Hashable | list[HashableT] | None = ...,
+    column: Hashable | list[HashableT1] | None = ...,
+    by: Hashable | list[HashableT2] | None = ...,
     ax: Axes | None = ...,
     fontsize: float | str | None = ...,
     rot: float = ...,
@@ -112,7 +118,7 @@ class PlotAccessor(PandasObject):
         title: Sequence[str] | None = ...,
         grid: bool | None = ...,
         legend: bool | Literal["reverse"] = ...,
-        style: str | list[str] | dict[HashableT, str] = ...,
+        style: str | list[str] | dict[HashableT1, str] = ...,
         logx: bool | Literal["sym"] = ...,
         logy: bool | Literal["sym"] = ...,
         loglog: bool | Literal["sym"] = ...,
@@ -131,7 +137,7 @@ class PlotAccessor(PandasObject):
         yerr: DataFrame | Series | ArrayLike | dict | str = ...,
         xerr: DataFrame | Series | ArrayLike | dict | str = ...,
         stacked: bool = ...,
-        secondary_y: bool | list[HashableT] | tuple[HashableT, ...] = ...,
+        secondary_y: bool | list[HashableT2] | tuple[HashableT2, ...] = ...,
         mark_right: bool = ...,
         include_bool: bool = ...,
         backend: str = ...,
@@ -157,7 +163,7 @@ class PlotAccessor(PandasObject):
             "hexbin",
         ] = ...,
         ax: Axes | None = ...,
-        subplots: Literal[True] | Sequence[Iterable[HashableT]],
+        subplots: Literal[True] | Sequence[Iterable[HashableT1]],
         sharex: bool = ...,
         sharey: bool = ...,
         layout: tuple[int, int] = ...,
@@ -166,7 +172,7 @@ class PlotAccessor(PandasObject):
         title: Sequence[str] | None = ...,
         grid: bool | None = ...,
         legend: bool | Literal["reverse"] = ...,
-        style: str | list[str] | dict[HashableT, str] = ...,
+        style: str | list[str] | dict[HashableT2, str] = ...,
         logx: bool | Literal["sym"] = ...,
         logy: bool | Literal["sym"] = ...,
         loglog: bool | Literal["sym"] = ...,
@@ -185,7 +191,7 @@ class PlotAccessor(PandasObject):
         yerr: DataFrame | Series | ArrayLike | dict | str = ...,
         xerr: DataFrame | Series | ArrayLike | dict | str = ...,
         stacked: bool = ...,
-        secondary_y: bool | list[HashableT] | tuple[HashableT, ...] = ...,
+        secondary_y: bool | list[HashableT3] | tuple[HashableT3, ...] = ...,
         mark_right: bool = ...,
         include_bool: bool = ...,
         backend: str = ...,
@@ -200,7 +206,7 @@ class PlotAccessor(PandasObject):
         y: Hashable | Sequence[Hashable] = ...,
         kind: Literal["box"],
         ax: Axes | None = ...,
-        subplots: Literal[True] | Sequence[Iterable[HashableT]],
+        subplots: Literal[True] | Sequence[Iterable[HashableT1]],
         sharex: bool = ...,
         sharey: bool = ...,
         layout: tuple[int, int] = ...,
@@ -209,7 +215,7 @@ class PlotAccessor(PandasObject):
         title: Sequence[str] | None = ...,
         grid: bool | None = ...,
         legend: bool | Literal["reverse"] = ...,
-        style: str | list[str] | dict[HashableT, str] = ...,
+        style: str | list[str] | dict[HashableT2, str] = ...,
         logx: bool | Literal["sym"] = ...,
         logy: bool | Literal["sym"] = ...,
         loglog: bool | Literal["sym"] = ...,
@@ -228,7 +234,7 @@ class PlotAccessor(PandasObject):
         yerr: DataFrame | Series | ArrayLike | dict | str = ...,
         xerr: DataFrame | Series | ArrayLike | dict | str = ...,
         stacked: bool = ...,
-        secondary_y: bool | list[HashableT] | tuple[HashableT, ...] = ...,
+        secondary_y: bool | list[HashableT3] | tuple[HashableT3, ...] = ...,
         mark_right: bool = ...,
         include_bool: bool = ...,
         backend: str = ...,

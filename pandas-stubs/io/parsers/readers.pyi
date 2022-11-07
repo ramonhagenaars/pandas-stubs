@@ -1,4 +1,7 @@
-from collections import abc
+from collections import (
+    abc,
+    defaultdict,
+)
 import csv
 from types import TracebackType
 from typing import (
@@ -13,7 +16,6 @@ from pandas.core.frame import DataFrame
 from pandas.core.indexes.base import Index
 from pandas.core.series import Series
 
-import pandas._libs.lib as lib
 from pandas._typing import (
     CompressionOptions,
     CSVEngine,
@@ -44,9 +46,9 @@ def read_csv(
     | npt.NDArray
     | Callable[[str], bool]
     | None = ...,
-    dtype: DtypeArg | None = ...,
+    dtype: DtypeArg | defaultdict | None = ...,
     engine: CSVEngine | None = ...,
-    converters: dict[int | str, Callable[[str], Any]] = ...,
+    converters: dict[int | str, Callable[[str], Any]] | None = ...,
     true_values: list[str] = ...,
     false_values: list[str] = ...,
     skipinitialspace: bool = ...,
@@ -107,9 +109,9 @@ def read_csv(
     | npt.NDArray
     | Callable[[str], bool]
     | None = ...,
-    dtype: DtypeArg | None = ...,
+    dtype: DtypeArg | defaultdict | None = ...,
     engine: CSVEngine | None = ...,
-    converters: dict[int | str, Callable[[str], Any]] = ...,
+    converters: dict[int | str, Callable[[str], Any]] | None = ...,
     true_values: list[str] = ...,
     false_values: list[str] = ...,
     skipinitialspace: bool = ...,
@@ -170,9 +172,9 @@ def read_csv(
     | npt.NDArray
     | Callable[[str], bool]
     | None = ...,
-    dtype: DtypeArg | None = ...,
+    dtype: DtypeArg | defaultdict | None = ...,
     engine: CSVEngine | None = ...,
-    converters: dict[int | str, Callable[[str], Any]] = ...,
+    converters: dict[int | str, Callable[[str], Any]] | None = ...,
     true_values: list[str] = ...,
     false_values: list[str] = ...,
     skipinitialspace: bool = ...,
@@ -233,9 +235,9 @@ def read_table(
     | npt.NDArray
     | Callable[[str], bool]
     | None = ...,
-    dtype: DtypeArg | None = ...,
+    dtype: DtypeArg | defaultdict | None = ...,
     engine: CSVEngine | None = ...,
-    converters: dict[int | str, Callable[[str], Any]] = ...,
+    converters: dict[int | str, Callable[[str], Any]] | None = ...,
     true_values: list[str] = ...,
     false_values: list[str] = ...,
     skipinitialspace: bool = ...,
@@ -296,9 +298,9 @@ def read_table(
     | npt.NDArray
     | Callable[[str], bool]
     | None = ...,
-    dtype: DtypeArg | None = ...,
+    dtype: DtypeArg | defaultdict | None = ...,
     engine: CSVEngine | None = ...,
-    converters: dict[int | str, Callable[[str], Any]] = ...,
+    converters: dict[int | str, Callable[[str], Any]] | None = ...,
     true_values: list[str] = ...,
     false_values: list[str] = ...,
     skipinitialspace: bool = ...,
@@ -359,9 +361,9 @@ def read_table(
     | npt.NDArray
     | Callable[[str], bool]
     | None = ...,
-    dtype: DtypeArg | None = ...,
+    dtype: DtypeArg | defaultdict | None = ...,
     engine: CSVEngine | None = ...,
-    converters: dict[int | str, Callable[[str], Any]] = ...,
+    converters: dict[int | str, Callable[[str], Any]] | None = ...,
     true_values: list[str] = ...,
     false_values: list[str] = ...,
     skipinitialspace: bool = ...,
