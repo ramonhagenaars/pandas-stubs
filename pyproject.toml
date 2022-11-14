@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pandas-stubs"
+name = "pandas-stubs-fork"
 version = "1.5.1.221024"
 description = "Type annotations for pandas"
 authors = ["The Pandas Development Team <pandas-dev@python.org>"]
