@@ -1,11 +1,12 @@
+from collections.abc import Collection
 from datetime import (
     date,
     datetime,
+    time,
     timedelta,
 )
 from typing import (
     Any,
-    Collection,
     Literal,
     TypeVar,
     overload,
@@ -78,6 +79,7 @@ class BaseOffset:
     def name(self) -> str: ...
     @property
     def rule_code(self) -> str: ...
+    @property
     def freqstr(self) -> str: ...
     def apply_index(self, dtindex: DatetimeIndex) -> DatetimeIndex: ...
     def rollback(self, dt: datetime) -> datetime: ...
@@ -131,8 +133,8 @@ class BusinessHour(BusinessMixin):
         self,
         n: int = ...,
         normalize: bool = ...,
-        start: str | Collection[str] = ...,
-        end: str | Collection[str] = ...,
+        start: str | time | Collection[str | time] = ...,
+        end: str | time | Collection[str | time] = ...,
         offset: timedelta = ...,
     ): ...
 
@@ -217,8 +219,8 @@ class CustomBusinessHour(BusinessHour):
         self,
         n: int = ...,
         normalize: bool = ...,
-        start: str = ...,
-        end: str = ...,
+        start: str | time | Collection[str | time] = ...,
+        end: str | time | Collection[str | time] = ...,
         offset: timedelta = ...,
         holidays: list | None = ...,
     ): ...

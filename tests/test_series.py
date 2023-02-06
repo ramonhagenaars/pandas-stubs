@@ -7,11 +7,13 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
-    Hashable,
+    Generic,
     Iterable,
     Iterator,
     List,
     Sequence,
+    Tuple,
+    TypeVar,
     cast,
 )
 
@@ -36,6 +38,7 @@ from tests import (
     PD_LTE_15,
     TYPE_CHECKING_INVALID_USAGE,
     check,
+    pytest_warns_bounded,
 )
 
 if TYPE_CHECKING:
@@ -237,7 +240,7 @@ def test_types_sort_values() -> None:
     s = pd.Series([4, 2, 1, 3])
     check(assert_type(s.sort_values(), pd.Series), pd.Series)
     if TYPE_CHECKING_INVALID_USAGE:
-        check(assert_type(s.sort_values(0), pd.Series), pd.Series)  # type: ignore[assert-type,call-overload]
+        check(assert_type(s.sort_values(0), pd.Series), pd.Series)  # type: ignore[assert-type,call-overload] # pyright: ignore[reportGeneralTypeIssues]
     check(assert_type(s.sort_values(axis=0), pd.Series), pd.Series)
     check(assert_type(s.sort_values(ascending=False), pd.Series), pd.Series)
     assert assert_type(s.sort_values(inplace=True, kind="quicksort"), None) is None
@@ -259,16 +262,30 @@ def test_types_shift() -> None:
 
 
 def test_types_rank() -> None:
-    s = pd.Series([1, 1, 2, 5, 6, np.nan, "milion"])
-    with pytest.warns(FutureWarning, match="Dropping of nuisance columns"):
+    s = pd.Series([1, 1, 2, 5, 6, np.nan])
+    if PD_LTE_15:
+        s[6] = "million"
+    with pytest_warns_bounded(
+        FutureWarning,
+        match="Dropping of nuisance columns",
+        upper="1.5.99",
+    ):
         s.rank()
-    with pytest.warns(FutureWarning, match="Dropping of nuisance columns"):
+    with pytest_warns_bounded(
+        FutureWarning, match="Dropping of nuisance columns", upper="1.5.99"
+    ):
         s.rank(axis=0, na_option="bottom")
-    with pytest.warns(FutureWarning, match="Dropping of nuisance columns"):
+    with pytest_warns_bounded(
+        FutureWarning, match="Dropping of nuisance columns", upper="1.5.99"
+    ):
         s.rank(method="min", pct=True)
-    with pytest.warns(FutureWarning, match="Dropping of nuisance columns"):
+    with pytest_warns_bounded(
+        FutureWarning, match="Dropping of nuisance columns", upper="1.5.99"
+    ):
         s.rank(method="dense", ascending=True)
-    with pytest.warns(FutureWarning, match="Calling Series.rank with numeric_only"):
+    with pytest_warns_bounded(
+        FutureWarning, match="Calling Series.rank with numeric_only", upper="1.5.99"
+    ):
         s.rank(method="first", numeric_only=True)
     s2 = pd.Series([1, 1, 2, 5, 6, np.nan])
     s2.rank(method="first", numeric_only=True)
@@ -436,6 +453,8 @@ def test_types_element_wise_arithmetic() -> None:
     res_pow: pd.Series = s ** s2.abs()
     res_pow2: pd.Series = s.pow(s2.abs(), fill_value=0)
 
+    check(assert_type(divmod(s, s2), Tuple[pd.Series, pd.Series]), tuple)
+
 
 def test_types_scalar_arithmetic() -> None:
     s = pd.Series([0, 1, -10])
@@ -545,7 +564,7 @@ def test_types_window() -> None:
     s.expanding()
     s.expanding(axis=0)
     if TYPE_CHECKING_INVALID_USAGE:
-        s.expanding(axis=0, center=True)  # type: ignore[call-arg]
+        s.expanding(axis=0, center=True)  # type: ignore[call-arg] # pyright: ignore[reportGeneralTypeIssues]
 
     s.rolling(2)
     s.rolling(2, axis=0, center=True)
@@ -643,17 +662,25 @@ def test_types_transform() -> None:
 
 def test_types_describe() -> None:
     s = pd.Series([1, 2, 3, np.datetime64("2000-01-01")])
-    with pytest.warns(DeprecationWarning, match="elementwise comparison failed"):
+    with pytest_warns_bounded(
+        DeprecationWarning, match="elementwise comparison failed", upper="1.5.99"
+    ):
         s.describe()
-    with pytest.warns(DeprecationWarning, match="elementwise comparison failed"):
+    with pytest_warns_bounded(
+        DeprecationWarning, match="elementwise comparison failed", upper="1.5.99"
+    ):
         s.describe(percentiles=[0.5], include="all")
-    with pytest.warns(DeprecationWarning, match="elementwise comparison failed"):
+    with pytest_warns_bounded(
+        DeprecationWarning, match="elementwise comparison failed", upper="1.5.99"
+    ):
         s.describe(exclude=np.number)
     if PD_LTE_15:
         # datetime_is_numeric param added in 1.1.0
         # https://pandas.pydata.org/docs/whatsnew/v1.1.0.html
         # Remove in 2.0.0
-        with pytest.warns(DeprecationWarning, match="elementwise comparison failed"):
+        with pytest_warns_bounded(
+            DeprecationWarning, match="elementwise comparison failed", upper="1.5.99"
+        ):
             s.describe(datetime_is_numeric=True)
 
 
@@ -725,7 +752,7 @@ def test_types_rename() -> None:
     s6: None = pd.Series([1, 2, 3]).rename("A", inplace=True)
 
     if TYPE_CHECKING_INVALID_USAGE:
-        s7 = pd.Series([1, 2, 3]).rename({1: [3, 4, 5]})  # type: ignore[dict-item]
+        s7 = pd.Series([1, 2, 3]).rename({1: [3, 4, 5]})  # type: ignore[dict-item] # pyright: ignore[reportGeneralTypeIssues]
 
 
 def test_types_ne() -> None:
@@ -853,6 +880,7 @@ def test_reset_index() -> None:
     check(assert_type(r5, pd.Series), pd.Series)
     r6 = s.reset_index(["ab"], drop=True, allow_duplicates=True)
     check(assert_type(r6, pd.Series), pd.Series)
+    assert assert_type(s.reset_index(inplace=True, drop=True), None) is None
 
 
 def test_series_add_str() -> None:
@@ -971,7 +999,7 @@ def test_types_to_list() -> None:
 
 def test_types_to_dict() -> None:
     s = pd.Series(["a", "b", "c"], dtype=str)
-    assert_type(s.to_dict(), Dict[Hashable, str])
+    assert_type(s.to_dict(), Dict[Any, str])
 
 
 def test_categorical_codes():
@@ -995,6 +1023,7 @@ def test_string_accessors():
     check(assert_type(s.str.decode("utf-8"), pd.Series), pd.Series)
     check(assert_type(s.str.encode("latin-1"), pd.Series), pd.Series)
     check(assert_type(s.str.endswith("e"), "pd.Series[bool]"), pd.Series, bool)
+    check(assert_type(s.str.endswith(("e", "f")), "pd.Series[bool]"), pd.Series, bool)
     check(assert_type(s3.str.extract(r"([ab])?(\d)"), pd.DataFrame), pd.DataFrame)
     check(assert_type(s3.str.extractall(r"([ab])?(\d)"), pd.DataFrame), pd.DataFrame)
     check(assert_type(s.str.find("p"), pd.Series), pd.Series)
@@ -1038,6 +1067,11 @@ def test_string_accessors():
     # GH 194
     check(assert_type(s.str.split("a", expand=True), pd.DataFrame), pd.DataFrame)
     check(assert_type(s.str.startswith("a"), "pd.Series[bool]"), pd.Series, bool)
+    check(
+        assert_type(s.str.startswith(("a", "b")), "pd.Series[bool]"),
+        pd.Series,
+        bool,
+    )
     check(assert_type(s.str.strip(), pd.Series), pd.Series)
     check(assert_type(s.str.swapcase(), pd.Series), pd.Series)
     check(assert_type(s.str.title(), pd.Series), pd.Series)
@@ -1324,3 +1358,32 @@ def test_logical_operators() -> None:
         pd.Series,
         bool,
     )
+
+
+def test_AnyArrayLike_and_clip() -> None:
+    ser = pd.Series([1, 2, 3])
+    s1 = ser.clip(lower=ser)
+    s2 = ser.clip(upper=ser)
+    check(assert_type(s1, pd.Series), pd.Series)
+    check(assert_type(s2, pd.Series), pd.Series)
+
+
+def test_pandera_generic() -> None:
+    # GH 471
+    T = TypeVar("T")
+
+    class MySeries(pd.Series, Generic[T]):
+        ...
+
+    def func() -> MySeries[float]:
+        return MySeries[float]([1, 2, 3])
+
+    func()
+
+
+def test_change_to_dict_return_type() -> None:
+    id = [1, 2, 3]
+    value = ["a", "b", "c"]
+    df = pd.DataFrame(zip(id, value), columns=["id", "value"])
+    fd = df.set_index("id")["value"].to_dict()
+    check(assert_type(fd, Dict[Any, Any]), dict)

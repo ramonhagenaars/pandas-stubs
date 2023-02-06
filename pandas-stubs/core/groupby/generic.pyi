@@ -1,12 +1,14 @@
-from typing import (
-    Any,
+from collections.abc import (
     Callable,
-    Generic,
     Iterable,
     Iterator,
+    Sequence,
+)
+from typing import (
+    Any,
+    Generic,
     Literal,
     NamedTuple,
-    Sequence,
     Union,
     overload,
 )
@@ -31,6 +33,7 @@ from pandas._typing import (
     AxisType,
     Level,
     ListLike,
+    RandomState,
     Scalar,
 )
 
@@ -61,18 +64,28 @@ class SeriesGroupBy(GroupBy, Generic[S1]):
     def agg(self, func: list[AggFuncTypeBase], *args, **kwargs) -> DataFrame: ...
     @overload
     def agg(self, func: AggFuncTypeBase, *args, **kwargs) -> Series: ...
-    def transform(self, func, *args, **kwargs): ...
+    def transform(self, func: Callable | str, *args, **kwargs) -> Series: ...
     def filter(self, func, dropna: bool = ..., *args, **kwargs): ...
     def nunique(self, dropna: bool = ...) -> Series: ...
     def describe(self, **kwargs) -> DataFrame: ...
+    @overload
     def value_counts(
         self,
-        normalize: bool = ...,
+        normalize: Literal[False] = ...,
         sort: bool = ...,
         ascending: bool = ...,
         bins=...,
         dropna: bool = ...,
-    ) -> DataFrame: ...
+    ) -> Series[int]: ...
+    @overload
+    def value_counts(
+        self,
+        normalize: Literal[True],
+        sort: bool = ...,
+        ascending: bool = ...,
+        bins=...,
+        dropna: bool = ...,
+    ) -> Series[float]: ...
     def count(self) -> Series[int]: ...
     def pct_change(
         self,
@@ -156,7 +169,7 @@ class DataFrameGroupBy(GroupBy):
     ) -> DataFrame: ...
     def aggregate(self, arg: AggFuncTypeFrame = ..., *args, **kwargs) -> DataFrame: ...
     agg = aggregate
-    def transform(self, func, *args, **kwargs): ...
+    def transform(self, func: Callable | str, *args, **kwargs) -> DataFrame: ...
     def filter(
         self, func: Callable, dropna: bool = ..., *args, **kwargs
     ) -> DataFrame: ...
@@ -290,7 +303,7 @@ class DataFrameGroupBy(GroupBy):
         frac: float | None = ...,
         replace: bool = ...,
         weights: ListLike | None = ...,
-        random_state: int | None = ...,
+        random_state: RandomState | None = ...,
     ) -> DataFrame: ...
     def sem(self, ddof: int = ..., numeric_only: bool = ...) -> DataFrame: ...
     def shift(
@@ -349,3 +362,4 @@ class DataFrameGroupBy(GroupBy):
         ascending: bool = ...,
         dropna: bool = ...,
     ) -> Series[float]: ...
+    def __getattr__(self, name: str) -> SeriesGroupBy: ...

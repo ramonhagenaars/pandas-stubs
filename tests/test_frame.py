@@ -18,11 +18,14 @@ from typing import (
     List,
     Mapping,
     Tuple,
+    TypedDict,
     TypeVar,
     Union,
+    cast,
 )
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from pandas._testing import (
     ensure_clean,
@@ -228,6 +231,10 @@ def test_types_sample() -> None:
     # GH 67
     check(assert_type(df.sample(frac=0.5), pd.DataFrame), pd.DataFrame)
     check(assert_type(df.sample(n=1), pd.DataFrame), pd.DataFrame)
+    check(
+        assert_type(df.sample(n=1, random_state=np.random.default_rng()), pd.DataFrame),
+        pd.DataFrame,
+    )
 
 
 def test_types_nlargest_nsmallest() -> None:
@@ -461,29 +468,234 @@ def test_types_unique() -> None:
 
 
 def test_types_apply() -> None:
-    df = pd.DataFrame(data={"col1": [2, 1], "col2": [3, 4]})
+    df = pd.DataFrame(data={"col1": [1, 2], "col2": [3, 4], "col3": [5, 6]})
+
+    def returns_scalar(x: pd.Series) -> int:
+        return 2
 
     def returns_series(x: pd.Series) -> pd.Series:
         return x**2
 
-    check(assert_type(df.apply(returns_series), pd.DataFrame), pd.DataFrame)
+    def returns_listlike_of_2(x: pd.Series) -> tuple[int, int]:
+        return (7, 8)
 
-    def returns_scalar(x: pd.Series) -> float:
-        return 2
+    def returns_listlike_of_3(x: pd.Series) -> tuple[int, int, int]:
+        return (7, 8, 9)
 
-    check(assert_type(df.apply(returns_scalar), pd.Series), pd.Series)
-    check(
-        assert_type(df.apply(returns_scalar, result_type="broadcast"), pd.DataFrame),
-        pd.DataFrame,
-    )
+    def returns_dict(x: pd.Series) -> dict[str, int]:
+        return {"col4": 7, "col5": 8}
+
+    # Misc checks
     check(assert_type(df.apply(np.exp), pd.DataFrame), pd.DataFrame)
-    check(assert_type(df.apply(str), pd.Series), pd.Series)
+    check(assert_type(df.apply(str), "pd.Series[str]"), pd.Series, str)
 
     # GH 393
     def gethead(s: pd.Series, y: int) -> pd.Series:
         return s.head(y)
 
     check(assert_type(df.apply(gethead, args=(4,)), pd.DataFrame), pd.DataFrame)
+
+    # Check various return types for default result_type (None) with default axis (0)
+    check(assert_type(df.apply(returns_scalar), "pd.Series[int]"), pd.Series, int)
+    check(assert_type(df.apply(returns_series), pd.DataFrame), pd.DataFrame)
+    check(assert_type(df.apply(returns_listlike_of_3), pd.DataFrame), pd.DataFrame)
+    check(assert_type(df.apply(returns_dict), pd.Series), pd.Series)
+
+    # Check various return types for result_type="expand" with default axis (0)
+    check(
+        # Note that technically it does not make sense
+        # to pass a result_type of "expand" to a scalar return
+        assert_type(df.apply(returns_scalar, result_type="expand"), "pd.Series[int]"),
+        pd.Series,
+        int,
+    )
+    check(
+        assert_type(df.apply(returns_series, result_type="expand"), pd.DataFrame),
+        pd.DataFrame,
+    )
+    check(
+        assert_type(
+            df.apply(returns_listlike_of_3, result_type="expand"), pd.DataFrame
+        ),
+        pd.DataFrame,
+    )
+    check(
+        assert_type(df.apply(returns_dict, result_type="expand"), pd.DataFrame),
+        pd.DataFrame,
+    )
+
+    # Check various return types for result_type="reduce" with default axis (0)
+    check(
+        # Note that technically it does not make sense
+        # to pass a result_type of "reduce" to a scalar return
+        assert_type(df.apply(returns_scalar, result_type="reduce"), "pd.Series[int]"),
+        pd.Series,
+        int,
+    )
+    check(
+        # Note that technically it does not make sense
+        # to pass a result_type of "reduce" to a series return
+        assert_type(df.apply(returns_series, result_type="reduce"), pd.Series),
+        pd.Series,  # This technically returns a pd.Series[pd.Series], but typing does not support that
+    )
+    check(
+        assert_type(df.apply(returns_listlike_of_3, result_type="reduce"), pd.Series),
+        pd.Series,
+    )
+    check(
+        assert_type(df.apply(returns_dict, result_type="reduce"), pd.Series), pd.Series
+    )
+
+    # Check various return types for default result_type (None) with axis=1
+    check(
+        assert_type(df.apply(returns_scalar, axis=1), "pd.Series[int]"), pd.Series, int
+    )
+    check(assert_type(df.apply(returns_series, axis=1), pd.DataFrame), pd.DataFrame)
+    check(assert_type(df.apply(returns_listlike_of_3, axis=1), pd.Series), pd.Series)
+    check(assert_type(df.apply(returns_dict, axis=1), pd.Series), pd.Series)
+
+    # Check various return types for result_type="expand" with axis=1
+    check(
+        # Note that technically it does not make sense
+        # to pass a result_type of "expand" to a scalar return
+        assert_type(
+            df.apply(returns_scalar, axis=1, result_type="expand"), "pd.Series[int]"
+        ),
+        pd.Series,
+        int,
+    )
+    check(
+        assert_type(
+            df.apply(returns_series, axis=1, result_type="expand"), pd.DataFrame
+        ),
+        pd.DataFrame,
+    )
+    check(
+        assert_type(
+            df.apply(returns_listlike_of_3, axis=1, result_type="expand"), pd.DataFrame
+        ),
+        pd.DataFrame,
+    )
+    check(
+        assert_type(df.apply(returns_dict, axis=1, result_type="expand"), pd.DataFrame),
+        pd.DataFrame,
+    )
+
+    # Check various return types for result_type="reduce" with axis=1
+    check(
+        # Note that technically it does not make sense
+        # to pass a result_type of "reduce" to a scalar return
+        assert_type(
+            df.apply(returns_scalar, axis=1, result_type="reduce"), "pd.Series[int]"
+        ),
+        pd.Series,
+        int,
+    )
+    check(
+        # Note that technically it does not make sense
+        # to pass a result_type of "reduce" to a series return
+        assert_type(
+            df.apply(returns_series, axis=1, result_type="reduce"), pd.DataFrame
+        ),
+        pd.DataFrame,
+    )
+    check(
+        assert_type(
+            df.apply(returns_listlike_of_3, axis=1, result_type="reduce"), pd.Series
+        ),
+        pd.Series,
+    )
+    check(
+        assert_type(df.apply(returns_dict, axis=1, result_type="reduce"), pd.Series),
+        pd.Series,
+    )
+
+    # Check various return types for result_type="broadcast" with axis=0 and axis=1
+    check(
+        # Note that technically it does not make sense
+        # to pass a result_type of "broadcast" to a scalar return
+        assert_type(df.apply(returns_scalar, result_type="broadcast"), pd.DataFrame),
+        pd.DataFrame,
+    )
+    check(
+        assert_type(df.apply(returns_series, result_type="broadcast"), pd.DataFrame),
+        pd.DataFrame,
+    )
+    check(
+        # Can only broadcast a list-like of 2 elements, not 3, because there are 2 rows
+        assert_type(
+            df.apply(returns_listlike_of_2, result_type="broadcast"), pd.DataFrame
+        ),
+        pd.DataFrame,
+    )
+    check(
+        # Note that technicaly it does not make sense
+        # to pass a result_type of "broadcast" to a scalar return
+        assert_type(
+            df.apply(returns_scalar, axis=1, result_type="broadcast"), pd.DataFrame
+        ),
+        pd.DataFrame,
+    )
+    check(
+        assert_type(
+            df.apply(returns_series, axis=1, result_type="broadcast"), pd.DataFrame
+        ),
+        pd.DataFrame,
+    )
+    check(
+        assert_type(
+            # Can only broadcast a list-like of 3 elements, not 2,
+            # as there are 3 columns
+            df.apply(returns_listlike_of_3, axis=1, result_type="broadcast"),
+            pd.DataFrame,
+        ),
+        pd.DataFrame,
+    )
+    # Since dicts will be assigned to elements of np.ndarray inside broadcasting,
+    # we need to use a DataFrame with object dtype to make the assignment possible.
+    df2 = pd.DataFrame({"col1": ["a", "b"], "col2": ["c", "d"]})
+    check(
+        assert_type(df2.apply(returns_dict, result_type="broadcast"), pd.DataFrame),
+        pd.DataFrame,
+    )
+    check(
+        assert_type(
+            df2.apply(returns_dict, axis=1, result_type="broadcast"), pd.DataFrame
+        ),
+        pd.DataFrame,
+    )
+
+    # Test various other positional/keyword argument combinations
+    # to ensure all overloads are supported
+    check(
+        assert_type(df.apply(returns_scalar, axis=0), "pd.Series[int]"), pd.Series, int
+    )
+    check(
+        assert_type(
+            df.apply(returns_scalar, axis=0, result_type=None), "pd.Series[int]"
+        ),
+        pd.Series,
+        int,
+    )
+    check(
+        assert_type(df.apply(returns_scalar, 0, False, None), "pd.Series[int]"),
+        pd.Series,
+        int,
+    )
+    check(
+        assert_type(
+            df.apply(returns_scalar, 0, False, result_type=None), "pd.Series[int]"
+        ),
+        pd.Series,
+        int,
+    )
+    check(
+        assert_type(
+            df.apply(returns_scalar, 0, raw=False, result_type=None), "pd.Series[int]"
+        ),
+        pd.Series,
+        int,
+    )
 
 
 def test_types_applymap() -> None:
@@ -773,7 +985,7 @@ def test_types_window() -> None:
     df.expanding()
     df.expanding(axis=1)
     if TYPE_CHECKING_INVALID_USAGE:
-        df.expanding(axis=1, center=True)  # type: ignore[call-arg]
+        df.expanding(axis=1, center=True)  # type: ignore[call-arg] # pyright: ignore[reportGeneralTypeIssues]
 
     df.rolling(2)
     df.rolling(2, axis=1, center=True)
@@ -1102,17 +1314,25 @@ def test_types_to_parquet() -> None:
 
 def test_types_to_latex() -> None:
     df = pd.DataFrame([[1, 2], [8, 9]], columns=["A", "B"])
-    with pytest.warns(FutureWarning, match="In future versions `DataFrame.to_latex`"):
+    with pytest_warns_bounded(
+        FutureWarning, match="In future versions `DataFrame.to_latex`", upper="1.5.999"
+    ):
         df.to_latex(
             columns=["A"], label="some_label", caption="some_caption", multirow=True
         )
-    with pytest.warns(FutureWarning, match="In future versions `DataFrame.to_latex`"):
+    with pytest_warns_bounded(
+        FutureWarning, match="In future versions `DataFrame.to_latex`", upper="1.5.999"
+    ):
         df.to_latex(escape=False, decimal=",", column_format="r")
     # position param was added in 1.2.0 https://pandas.pydata.org/docs/whatsnew/v1.2.0.html
-    with pytest.warns(FutureWarning, match="In future versions `DataFrame.to_latex`"):
+    with pytest_warns_bounded(
+        FutureWarning, match="In future versions `DataFrame.to_latex`", upper="1.5.999"
+    ):
         df.to_latex(position="some")
     # caption param was extended to accept tuple in 1.2.0 https://pandas.pydata.org/docs/whatsnew/v1.2.0.html
-    with pytest.warns(FutureWarning, match="In future versions `DataFrame.to_latex`"):
+    with pytest_warns_bounded(
+        FutureWarning, match="In future versions `DataFrame.to_latex`", upper="1.5.999"
+    ):
         df.to_latex(caption=("cap1", "cap2"))
 
 
@@ -1121,6 +1341,7 @@ def test_types_explode() -> None:
     res1: pd.DataFrame = df.explode("A")
     res2: pd.DataFrame = df.explode("A", ignore_index=False)
     res3: pd.DataFrame = df.explode("A", ignore_index=True)
+    res4: pd.DataFrame = df.explode(["A", "B"])
 
 
 def test_types_rename() -> None:
@@ -1277,6 +1498,94 @@ def test_read_csv() -> None:
             pd.DataFrame,
         )
 
+        # Allow a variety of dict types for the converters parameter
+        converters1 = {"A": str, "B": str}
+        check(
+            assert_type(pd.read_csv(path, converters=converters1), pd.DataFrame),
+            pd.DataFrame,
+        )
+        converters2 = {"A": str, "B": float}
+        check(
+            assert_type(pd.read_csv(path, converters=converters2), pd.DataFrame),
+            pd.DataFrame,
+        )
+        converters3 = {0: str, 1: str}
+        check(
+            assert_type(pd.read_csv(path, converters=converters3), pd.DataFrame),
+            pd.DataFrame,
+        )
+        converters4 = {0: str, 1: float}
+        check(
+            assert_type(pd.read_csv(path, converters=converters4), pd.DataFrame),
+            pd.DataFrame,
+        )
+        converters5: dict[int | str, Callable[[str], Any]] = {
+            0: str,
+            "A": float,
+        }
+        check(
+            assert_type(pd.read_csv(path, converters=converters5), pd.DataFrame),
+            pd.DataFrame,
+        )
+
+        class ReadCsvKwargs(TypedDict):
+            converters: dict[int, Callable[[str], Any]]
+
+        read_csv_kwargs: ReadCsvKwargs = {"converters": {0: int}}
+
+        check(
+            assert_type(pd.read_csv(path, **read_csv_kwargs), pd.DataFrame),
+            pd.DataFrame,
+        )
+
+        # Check value covariance for various other parameters too (these only accept a str key)
+        na_values = {"A": ["1"], "B": ["1"]}
+        check(
+            assert_type(pd.read_csv(path, na_values=na_values), pd.DataFrame),
+            pd.DataFrame,
+        )
+
+    # There are several possible inputs for parse_dates
+    with ensure_clean() as path:
+        Path(path).write_text("Date,Year,Month,Day\n20221125,2022,11,25")
+        parse_dates_1 = ["Date"]
+        check(
+            assert_type(pd.read_csv(path, parse_dates=parse_dates_1), pd.DataFrame),
+            pd.DataFrame,
+        )
+        check(
+            assert_type(
+                pd.read_csv(path, index_col="Date", parse_dates=True), pd.DataFrame
+            ),
+            pd.DataFrame,
+        )
+        parse_dates_2 = {"combined_date": ["Year", "Month", "Day"]}
+        check(
+            assert_type(pd.read_csv(path, parse_dates=parse_dates_2), pd.DataFrame),
+            pd.DataFrame,
+        )
+        parse_dates_3 = {"combined_date": [1, 2, 3]}
+        check(
+            assert_type(pd.read_csv(path, parse_dates=parse_dates_3), pd.DataFrame),
+            pd.DataFrame,
+        )
+        # MyPy calls this Dict[str, object] by default which necessitates the explicit annotation (Pyright does not)
+        parse_dates_4: dict[str, list[str | int]] = {"combined_date": [1, "Month", 3]}
+        check(
+            assert_type(pd.read_csv(path, parse_dates=parse_dates_4), pd.DataFrame),
+            pd.DataFrame,
+        )
+        parse_dates_5 = [0]
+        check(
+            assert_type(pd.read_csv(path, parse_dates=parse_dates_5), pd.DataFrame),
+            pd.DataFrame,
+        )
+        parse_dates_6 = [[1, 2, 3]]
+        check(
+            assert_type(pd.read_csv(path, parse_dates=parse_dates_6), pd.DataFrame),
+            pd.DataFrame,
+        )
+
 
 def test_groupby_series_methods() -> None:
     df = pd.DataFrame({"x": [1, 2, 2, 3, 3], "y": [10, 20, 30, 40, 50]})
@@ -1299,7 +1608,7 @@ def test_groupby_series_methods() -> None:
     gb.min().loc[2]
     gb.nlargest().loc[2]
     gb.nsmallest().loc[2]
-    gb.nth(0).loc[2]
+    gb.nth(0).loc[1]
 
 
 def test_indexslice_setitem():
@@ -1375,7 +1684,9 @@ def test_getmultiindex_columns() -> None:
     res3: pd.DataFrame = df[
         [(i, s) for i in [1] for s in df.columns.get_level_values(1)]
     ]
-    ndf: pd.DataFrame = df[[df.columns[0]]]
+    res4: pd.DataFrame = df[[df.columns[0]]]
+    check(assert_type(df[df.columns[0]], pd.Series), pd.Series)
+    check(assert_type(df[li[0]], pd.Series), pd.Series)
 
 
 def test_frame_getitem_isin() -> None:
@@ -1478,9 +1789,10 @@ def test_iloc_tuple() -> None:
 def test_set_columns() -> None:
     # GH 73
     df = pd.DataFrame({"a": [1, 2, 3], "b": [0.0, 1, 1]})
-    # Next line should work, but it is a mypy bug
+    # Next lines should work, but it is a mypy bug
     # https://github.com/python/mypy/issues/3004
-    # pyright doesn't need the ignore
+    # pyright accepts this, so we only type check for pyright,
+    # and also test the code with pytest
     df.columns = ["c", "d"]  # type: ignore[assignment]
     df.columns = [1, 2]  # type: ignore[assignment]
     df.columns = [1, "a"]  # type: ignore[assignment]
@@ -1490,12 +1802,35 @@ def test_set_columns() -> None:
     df.columns = pd.Series([1, "a"])  # type: ignore[assignment]
     df.columns = (1, 2)  # type: ignore[assignment]
     df.columns = (1, "a")  # type: ignore[assignment]
+    if TYPE_CHECKING_INVALID_USAGE:
+        df.columns = "abc"  # type: ignore[assignment] # pyright: ignore[reportGeneralTypeIssues]
 
 
 def test_frame_index_numpy() -> None:
     # GH 80
     i = np.array([1.0, 2.0])
     pd.DataFrame([[1.0, 2.0], [3.0, 4.0]], columns=["a", "b"], index=i)
+
+
+def test_frame_stack() -> None:
+
+    multicol2 = pd.MultiIndex.from_tuples([("weight", "kg"), ("height", "m")])
+    df_multi_level_cols2 = pd.DataFrame(
+        [[1.0, 2.0], [3.0, 4.0]], index=["cat", "dog"], columns=multicol2
+    )
+
+    check(
+        assert_type(
+            df_multi_level_cols2.stack(0), Union[pd.DataFrame, "pd.Series[Any]"]
+        ),
+        pd.DataFrame,
+    )
+    check(
+        assert_type(
+            df_multi_level_cols2.stack([0, 1]), Union[pd.DataFrame, "pd.Series[Any]"]
+        ),
+        pd.Series,
+    )
 
 
 def test_frame_reindex() -> None:
@@ -1525,9 +1860,10 @@ def test_not_hashable() -> None:
     def test_func(h: Hashable):
         pass
 
-    test_func(pd.DataFrame())  # type: ignore[arg-type]
-    test_func(pd.Series([], dtype=object))  # type: ignore[arg-type]
-    test_func(pd.Index([]))  # type: ignore[arg-type]
+    if TYPE_CHECKING_INVALID_USAGE:
+        test_func(pd.DataFrame())  # type: ignore[arg-type] # pyright: ignore[reportGeneralTypeIssues]
+        test_func(pd.Series([], dtype=object))  # type: ignore[arg-type] # pyright: ignore[reportGeneralTypeIssues]
+        test_func(pd.Index([]))  # type: ignore[arg-type] # pyright: ignore[reportGeneralTypeIssues]
 
 
 def test_columns_mixlist() -> None:
@@ -1923,13 +2259,147 @@ def test_resample_150_changes() -> None:
     check(assert_type(resampler.apply(f), Union[pd.Series, pd.DataFrame]), pd.DataFrame)
 
 
-def df_accepting_dicts_iterator() -> None:
+def test_df_accepting_dicts_iterator() -> None:
     # GH 392
     data = [{"a": 1, "b": 2}, {"a": 3, "b": 5}]
     check(assert_type(pd.DataFrame(iter(data)), pd.DataFrame), pd.DataFrame)
 
 
-def series_added_in_astype() -> None:
+def test_series_added_in_astype() -> None:
     # GH410
     df = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
     check(assert_type(df.astype(df.dtypes), pd.DataFrame), pd.DataFrame)
+
+
+def test_series_groupby_and_value_counts() -> None:
+    df = pd.DataFrame(
+        {
+            "Animal": ["Falcon", "Falcon", "Parrot", "Parrot"],
+            "Max Speed": [380, 370, 24, 26],
+        }
+    )
+    c1 = df.groupby("Animal")["Max Speed"].value_counts()
+    c2 = df.groupby("Animal")["Max Speed"].value_counts(normalize=True)
+    check(assert_type(c1, "pd.Series[int]"), pd.Series, int)
+    check(assert_type(c2, "pd.Series[float]"), pd.Series, float)
+
+
+def test_axes_as_tuple() -> None:
+    # GH 384
+    index = (3, 5, 7)
+    columns = ["a", "b", "c"]
+    df = pd.DataFrame(data=1, index=index, columns=columns)
+    check(assert_type(df, pd.DataFrame), pd.DataFrame)
+
+
+def test_astype_dict() -> None:
+    # GH 447
+    df = pd.DataFrame({"a": [1, 2, 3], 43: [4, 5, 6]})
+    columns_types = {"a": "int", 43: "float"}
+    df = df.astype(columns_types)
+    check(assert_type(df, pd.DataFrame), pd.DataFrame)
+
+
+def test_setitem_none() -> None:
+    df = pd.DataFrame(
+        {"A": [1, 2, 3], "B": ["abc", "def", "ghi"]}, index=["x", "y", "z"]
+    )
+    df.loc["x", "B"] = None
+    df.iloc[2, 0] = None
+    sb = pd.Series([1, 2, 3], dtype=int)
+    sb.loc["y"] = None
+    sb.iloc[0] = None
+
+
+def test_groupby_and_transform() -> None:
+    df = pd.DataFrame(
+        {
+            "A": ["foo", "bar", "foo", "bar", "foo", "bar"],
+            "B": ["one", "one", "two", "three", "two", "two"],
+            "C": [1, 5, 5, 2, 5, 5],
+            "D": [2.0, 5.0, 8.0, 1.0, 2.0, 9.0],
+        }
+    )
+    ser = pd.Series(
+        [390.0, 350.0, 30.0, 20.0],
+        index=["Falcon", "Falcon", "Parrot", "Parrot"],
+        name="Max Speed",
+    )
+    grouped = df.groupby("A")[["C", "D"]]
+    grouped1 = ser.groupby(ser > 100)
+    c1 = grouped.transform("sum")
+    c2 = grouped.transform(lambda x: (x - x.mean()) / x.std())
+    c3 = grouped1.transform("cumsum")
+    c4 = grouped1.transform(lambda x: x.max() - x.min())
+    check(assert_type(c1, pd.DataFrame), pd.DataFrame)
+    check(assert_type(c2, pd.DataFrame), pd.DataFrame)
+    check(assert_type(c3, pd.Series), pd.Series)
+    check(assert_type(c4, pd.Series), pd.Series)
+
+
+def test_getattr_and_dataframe_groupby() -> None:
+    df = pd.DataFrame(
+        data={"col1": [1, 1, 2], "col2": [3, 4, 5], "col3": [0, 1, 0], 0: [-1, -1, -1]}
+    )
+    check(assert_type(df.groupby("col1").col3.agg(min), pd.Series), pd.Series)
+    check(
+        assert_type(df.groupby("col1").col3.agg([min, max]), pd.DataFrame),
+        pd.DataFrame,
+    )
+
+
+def test_getsetitem_multiindex() -> None:
+    # GH 466
+    rows = pd.Index(["project A", "project B", "project C"])
+    years: tuple[str, ...] = ("Year 1", "Year 2", "Year 3")
+    quarters: tuple[str, ...] = ("Q1", "Q2", "Q3", "Q4")
+    index_tuples: list[tuple[str, ...]] = list(itertools.product(years, quarters))
+    cols = pd.MultiIndex.from_tuples(index_tuples)
+    budget = pd.DataFrame(index=rows, columns=cols)
+    multi_index: tuple[str, str] = ("Year 1", "Q1")
+    budget.loc["project A", multi_index] = 4700
+    check(assert_type(budget.loc["project A", multi_index], Scalar), int)
+
+
+def test_frame_dropna_subset() -> None:
+    # GH 434
+    data = {"col1": [1, 3, 4], "col2": [2, 3, 5], "col3": [2, 4, 4]}
+    df = pd.DataFrame(data)
+    check(
+        assert_type(df.dropna(subset=df.columns.drop("col1")), pd.DataFrame),
+        pd.DataFrame,
+    )
+
+
+def test_loc_callable() -> None:
+    # GH 256
+    df = pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]})
+
+    def select1(df: pd.DataFrame) -> pd.Series:
+        return df["x"] > 2.0
+
+    check(assert_type(df.loc[select1], pd.DataFrame), pd.DataFrame)
+    check(assert_type(df.loc[select1, :], pd.DataFrame), pd.DataFrame)
+
+    def select2(df: pd.DataFrame) -> list[Hashable]:
+        return [i for i in df.index if cast(int, i) % 2 == 1]
+
+    check(assert_type(df.loc[select2, "x"], pd.Series), pd.Series)
+
+    def select3(df: pd.DataFrame) -> int:
+        return 1
+
+    check(assert_type(df.loc[select3, "x"], Scalar), np.integer)
+
+
+def test_npint_loc_indexer() -> None:
+    # GH 508
+
+    df = pd.DataFrame(dict(x=[1, 2, 3]), index=np.array([10, 20, 30], dtype="uint64"))
+
+    def get_NDArray(df: pd.DataFrame, key: npt.NDArray[np.uint64]) -> pd.DataFrame:
+        df2 = df.loc[key]
+        return df2
+
+    a: npt.NDArray[np.uint64] = np.array([10, 30], dtype="uint64")
+    check(assert_type(get_NDArray(df, a), pd.DataFrame), pd.DataFrame)

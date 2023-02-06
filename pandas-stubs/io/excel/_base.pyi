@@ -1,11 +1,14 @@
-from types import TracebackType
-from typing import (
-    Any,
+from collections.abc import (
     Callable,
     Hashable,
     Iterable,
-    Literal,
+    Mapping,
     Sequence,
+)
+from types import TracebackType
+from typing import (
+    Any,
+    Literal,
     overload,
 )
 
@@ -39,9 +42,9 @@ def read_excel(
     names: list[str] | None = ...,
     index_col: int | Sequence[int] | None = ...,
     usecols: Sequence[int] | Sequence[str] | Callable[[str], bool] | None = ...,
-    dtype: str | Dtype | dict[str, str | Dtype] | None = ...,
+    dtype: str | Dtype | Mapping[str, str | Dtype] | None = ...,
     engine: Literal["xlrd", "openpyxl", "odf", "pyxlsb"] | None = ...,
-    converters: dict[int | str, Callable[[object], object]] | None = ...,
+    converters: Mapping[int | str, Callable[[object], object]] | None = ...,
     true_values: Iterable[Hashable] | None = ...,
     false_values: Iterable[Hashable] | None = ...,
     skiprows: int | Sequence[int] | Callable[[object], bool] | None = ...,
@@ -77,9 +80,9 @@ def read_excel(
     names: list[str] | None = ...,
     index_col: int | Sequence[int] | None = ...,
     usecols: Sequence[int] | Sequence[str] | Callable[[str], bool] | None = ...,
-    dtype: str | Dtype | dict[str, str | Dtype] | None = ...,
+    dtype: str | Dtype | Mapping[str, str | Dtype] | None = ...,
     engine: Literal["xlrd", "openpyxl", "odf", "pyxlsb"] | None = ...,
-    converters: dict[int | str, Callable[[object], object]] | None = ...,
+    converters: Mapping[int | str, Callable[[object], object]] | None = ...,
     true_values: Iterable[Hashable] | None = ...,
     false_values: Iterable[Hashable] | None = ...,
     skiprows: int | Sequence[int] | Callable[[object], bool] | None = ...,
@@ -104,7 +107,7 @@ class ExcelWriter:
     def __init__(
         self,
         path: FilePath | WriteExcelBuffer | ExcelWriter,
-        engine: Literal["auto", "openpyxl", "pyxlsb", "odf"] | None = ...,
+        engine: Literal["auto", "openpyxl", "odf", "xlsxwriter"] | None = ...,
         date_format: str | None = ...,
         datetime_format: str | None = ...,
         mode: Literal["w", "a"] = ...,
@@ -115,11 +118,11 @@ class ExcelWriter:
     @property
     def supported_extensions(self) -> tuple[str, ...]: ...
     @property
-    def engine(self) -> Literal["openpyxl", "pyxlsb", "odf"]: ...
+    def engine(self) -> Literal["openpyxl", "odf", "xlsxwriter"]: ...
     @property
     def sheets(self) -> dict[str, Any]: ...
     @property
-    def book(self) -> Workbook | OpenDocument | pyxlsb.workbook.Workbook: ...
+    def book(self) -> Workbook | OpenDocument: ...
     @property
     def date_format(self) -> str: ...
     @property

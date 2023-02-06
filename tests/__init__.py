@@ -3,9 +3,11 @@ from __future__ import annotations
 from contextlib import (
     AbstractContextManager,
     nullcontext,
+    suppress,
 )
 import os
 import platform
+import sys
 from typing import (
     TYPE_CHECKING,
     Final,
@@ -20,6 +22,16 @@ from pandas._typing import T
 TYPE_CHECKING_INVALID_USAGE: Final = TYPE_CHECKING
 WINDOWS = os.name == "nt" or "cygwin" in platform.system().lower()
 PD_LTE_15 = Version(pd.__version__) < Version("1.5.999")
+
+lxml_skip = pytest.mark.skipif(
+    sys.version_info >= (3, 11), reason="lxml is not available for 3.11 yet"
+)
+# This is only needed temporarily due to no wheels being available for lxml on 3.11
+
+pytables_skip = pytest.mark.skipif(
+    sys.version_info >= (3, 11), reason="pytables is not available for 3.11 yet"
+)
+# This is only needed temporarily due to no wheels being available for pytables on 3.11
 
 
 def check(actual: T, klass: type, dtype: type | None = None, attr: str = "left") -> T:
@@ -44,6 +56,8 @@ def pytest_warns_bounded(
     match: str,
     lower: str | None = None,
     upper: str | None = None,
+    version_str: str | None = None,
+    upper_exception: type[Exception] | None = None,
 ) -> AbstractContextManager:
     """
     Version conditional pytest.warns context manager
@@ -62,11 +76,17 @@ def pytest_warns_bounded(
         The lower bound of the version to check for the warning.
     upper : str, optional
         The upper bound of the version to check for the warning.
+    version_str: str, optional
+        The version string to use.  If None, then uses the pandas version.
+        Can be used to check a python version as well
+    upper_exception: Exception, optional
+        Exception to catch if the pandas version is greater than or equal to
+        the upper bound
 
     Notes
     -----
     The lower and upper bounds are exclusive so that a pytest.warns context
-    manager is returned if lower < pd.__version__ < upper.
+    manager is returned if lower < version_str < upper.
 
     Examples
     --------
@@ -85,11 +105,34 @@ def pytest_warns_bounded(
     ):
         # Versions between 1.3.x and 1.5.x will raise an error
         pass
+
+    with pytest_warns_bounded(
+        UserWarning, match="foo", lower="3.10",
+        version_str = platform.python_version()
+    ):
+        # Python version 3.11 and above will raise an error
+        # if the warning is not issued
+        pass
+
+    with pytest_warns_bounded(
+        UserWarning, match="foo", lower="1.2.99", upper="1.5.99",
+        upper_exception=AttributeError
+    ):
+        # Versions between 1.3.x and 1.5.x will raise an error
+        # Above 1.5.x, we expect an `AttributeError` to be raised
+        pass
+
     """
     lb = Version("0.0.0") if lower is None else Version(lower)
     ub = Version("9999.0.0") if upper is None else Version(upper)
-    current = Version(pd.__version__)
+    if version_str is None:
+        current = Version(pd.__version__)
+    else:
+        current = Version(version_str)
     if lb < current < ub:
         return pytest.warns(warning, match=match)
     else:
-        return nullcontext()
+        if upper_exception is None:
+            return nullcontext()
+        else:
+            return suppress(upper_exception)

@@ -1,16 +1,19 @@
 from builtins import type as type_t
+from collections.abc import (
+    Callable,
+    Hashable,
+    Iterator,
+    Mapping,
+    MutableSequence,
+    Sequence,
+)
 import datetime
 from os import PathLike
 from typing import (
     Any,
-    Callable,
-    Hashable,
-    Iterator,
     Literal,
-    Mapping,
     Optional,
     Protocol,
-    Sequence,
     TypedDict,
     TypeVar,
     Union,
@@ -26,13 +29,17 @@ from pandas.core.indexes.base import Index
 from pandas.core.series import Series
 from typing_extensions import TypeAlias
 
+from pandas._libs.interval import Interval
 from pandas._libs.tslibs import (
     Period,
     Timedelta,
     Timestamp,
 )
 
-from pandas.core.dtypes.dtypes import ExtensionDtype
+from pandas.core.dtypes.dtypes import (
+    CategoricalDtype,
+    ExtensionDtype,
+)
 
 from pandas.io.formats.format import EngFormatter
 
@@ -119,7 +126,7 @@ Level: TypeAlias = Union[Hashable, int]
 Suffixes: TypeAlias = tuple[Optional[str], Optional[str]]
 Ordered: TypeAlias = Optional[bool]
 JSONSerializable: TypeAlias = Union[PythonScalar, list, dict]
-Axes: TypeAlias = Union[AnyArrayLike, list, dict, range]
+Axes: TypeAlias = Union[AnyArrayLike, list, dict, range, tuple]
 Renamer: TypeAlias = Union[Mapping[Any, Label], Callable[[Any], Label]]
 T = TypeVar("T")
 FuncType: TypeAlias = Callable[..., Any]
@@ -150,13 +157,18 @@ num: TypeAlias = complex
 SeriesAxisType: TypeAlias = Literal[
     "index", 0
 ]  # Restricted subset of _AxisType for series
-AxisType: TypeAlias = Literal["columns", "index", 0, 1]
+AxisTypeIndex: TypeAlias = Literal["index", 0]
+AxisTypeColumn: TypeAlias = Literal["columns", 1]
+AxisType: TypeAlias = AxisTypeIndex | AxisTypeColumn
 DtypeNp = TypeVar("DtypeNp", bound=np.dtype[np.generic])
 KeysArgType: TypeAlias = Any
 ListLike = TypeVar("ListLike", Sequence, np.ndarray, "Series", "Index")
+ListLikeExceptSeriesAndStr = TypeVar(
+    "ListLikeExceptSeriesAndStr", MutableSequence, np.ndarray, tuple, "Index"
+)
 ListLikeU: TypeAlias = Union[Sequence, np.ndarray, Series, Index]
 StrLike: TypeAlias = Union[str, np.str_]
-Scalar: TypeAlias = Union[
+IndexIterScalar: TypeAlias = Union[
     str,
     bytes,
     datetime.date,
@@ -165,9 +177,12 @@ Scalar: TypeAlias = Union[
     bool,
     int,
     float,
-    complex,
     Timestamp,
     Timedelta,
+]
+Scalar: TypeAlias = Union[
+    IndexIterScalar,
+    complex,
 ]
 ScalarT = TypeVar("ScalarT", bound=Scalar)
 # Refine the definitions below in 3.9 to use the specialized type.
@@ -177,7 +192,7 @@ np_ndarray_anyint: TypeAlias = npt.NDArray[np.integer]
 np_ndarray_bool: TypeAlias = npt.NDArray[np.bool_]
 np_ndarray_str: TypeAlias = npt.NDArray[np.str_]
 
-IndexType: TypeAlias = Union[slice, np_ndarray_int64, Index, list[int], Series[int]]
+IndexType: TypeAlias = Union[slice, np_ndarray_anyint, Index, list[int], Series[int]]
 MaskType: TypeAlias = Union[Series[bool], np_ndarray_bool, list[bool]]
 # Scratch types for generics
 S1 = TypeVar(
@@ -185,9 +200,7 @@ S1 = TypeVar(
     str,
     bytes,
     datetime.date,
-    datetime.datetime,
     datetime.time,
-    datetime.timedelta,
     bool,
     int,
     float,
@@ -196,6 +209,11 @@ S1 = TypeVar(
     Timedelta,
     np.datetime64,
     Period,
+    Interval[int],
+    Interval[float],
+    Interval[Timestamp],
+    Interval[Timedelta],
+    CategoricalDtype,
 )
 T1 = TypeVar(
     "T1", str, int, np.int64, np.uint64, np.float64, float, np.dtype[np.generic]
@@ -221,7 +239,13 @@ NDFrameT = TypeVar("NDFrameT", bound=NDFrame)
 IndexT = TypeVar("IndexT", bound=Index)
 
 # Interval closed type
-
+IntervalT = TypeVar(
+    "IntervalT",
+    Interval[int],
+    Interval[float],
+    Interval[Timestamp],
+    Interval[Timedelta],
+)
 IntervalClosedType: TypeAlias = Literal["left", "right", "both", "neither"]
 
 IgnoreRaiseCoerce: TypeAlias = Literal["ignore", "raise", "coerce"]
@@ -302,7 +326,7 @@ MergeHow: TypeAlias = Union[JoinHow, Literal["cross"]]
 JsonFrameOrient: TypeAlias = Literal[
     "split", "records", "index", "columns", "values", "table"
 ]
-JsonSeriesOrient: TypeAlias = Literal["split", "records", "index"]
+JsonSeriesOrient: TypeAlias = Literal["split", "records", "index", "table"]
 
 TimestampConvention: TypeAlias = Literal["start", "end", "s", "e"]
 
@@ -354,4 +378,13 @@ ValidationOptions: TypeAlias = Literal[
     "many_to_many",
     "m:m",
 ]
+
+RandomState: TypeAlias = Union[
+    int,
+    ArrayLike,
+    np.random.Generator,
+    np.random.BitGenerator,
+    np.random.RandomState,
+]
+
 __all__ = ["npt", "type_t"]

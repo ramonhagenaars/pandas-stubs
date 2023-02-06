@@ -11,6 +11,7 @@ from typing import (
     Dict,
     Generator,
     List,
+    Literal,
     Union,
 )
 
@@ -65,6 +66,11 @@ from pandas.io.sas.sas7bdat import SAS7BDATReader
 from pandas.io.sas.sas_xport import XportReader
 from pandas.io.stata import StataReader
 
+from . import (
+    lxml_skip,
+    pytables_skip,
+)
+
 DF = DataFrame({"a": [1, 2, 3], "b": [0.0, 0.0, 0.0]})
 CWD = os.path.split(os.path.abspath(__file__))[0]
 
@@ -108,6 +114,7 @@ def test_orc_bytes():
     check(assert_type(DF.to_orc(index=False), bytes), bytes)
 
 
+@lxml_skip
 def test_xml():
     with ensure_clean() as path:
         check(assert_type(DF.to_xml(path), None), type(None))
@@ -116,6 +123,7 @@ def test_xml():
             check(assert_type(read_xml(f), DataFrame), DataFrame)
 
 
+@lxml_skip
 def test_xml_str():
     with ensure_clean() as path:
         check(assert_type(DF.to_xml(), str), str)
@@ -282,12 +290,14 @@ def test_sas_xport() -> None:
         pass
 
 
+@pytables_skip
 def test_hdf():
     with ensure_clean() as path:
         check(assert_type(DF.to_hdf(path, "df"), None), type(None))
         check(assert_type(read_hdf(path), Union[DataFrame, Series]), DataFrame)
 
 
+@pytables_skip
 def test_hdfstore():
     with ensure_clean() as path:
         store = HDFStore(path, model="w")
@@ -329,6 +339,7 @@ def test_hdfstore():
         store.close()
 
 
+@pytables_skip
 def test_read_hdf_iterator():
     with ensure_clean() as path:
         check(assert_type(DF.to_hdf(path, "df", format="table"), None), type(None))
@@ -343,6 +354,7 @@ def test_read_hdf_iterator():
         ti.close()
 
 
+@pytables_skip
 def test_hdf_context_manager():
     with ensure_clean() as path:
         check(assert_type(DF.to_hdf(path, "df", format="table"), None), type(None))
@@ -351,6 +363,7 @@ def test_hdf_context_manager():
             check(assert_type(store.get("df"), Union[DataFrame, Series]), DataFrame)
 
 
+@pytables_skip
 def test_hdf_series():
     s = DF["a"]
     with ensure_clean() as path:
@@ -380,6 +393,37 @@ def test_json_series():
         check(assert_type(s.to_json(path), None), type(None))
         check(assert_type(read_json(path, typ="series"), Series), Series)
     check(assert_type(DF.to_json(), str), str)
+    check(
+        assert_type(
+            read_json(s.to_json(orient=None), typ="series", orient=None), Series
+        ),
+        Series,
+    )
+    check(
+        assert_type(
+            read_json(s.to_json(orient="split"), typ="series", orient="split"), Series
+        ),
+        Series,
+    )
+    check(
+        assert_type(
+            read_json(s.to_json(orient="records"), typ="series", orient="records"),
+            Series,
+        ),
+        Series,
+    )
+    check(
+        assert_type(
+            read_json(s.to_json(orient="index"), typ="series", orient="index"), Series
+        ),
+        Series,
+    )
+    check(
+        assert_type(
+            read_json(s.to_json(orient="table"), typ="series", orient="table"), Series
+        ),
+        Series,
+    )
 
 
 def test_json_chunk():
@@ -525,7 +569,7 @@ def test_types_read_table():
         df2: pd.DataFrame = pd.read_table(path, sep=",", converters=None)
 
 
-def btest_read_fwf():
+def test_btest_read_fwf():
     with ensure_clean() as path:
         DF.to_string(path, index=False)
         check(assert_type(read_fwf(path), DataFrame), DataFrame)
@@ -542,12 +586,10 @@ def btest_read_fwf():
         with open(path, "rb") as fwf_file:
             bio = io.BytesIO(fwf_file.read())
             check(assert_type(read_fwf(bio), DataFrame), DataFrame)
-        fwf_iterator = read_fwf(path, iterator=True)
-        check(assert_type(fwf_iterator, TextFileReader), TextFileReader)
-        fwf_iterator.close()
-        fwf_iterator2 = read_fwf(path, chunksize=1)
-        check(assert_type(fwf_iterator2, TextFileReader), TextFileReader)
-        fwf_iterator.close()
+        with read_fwf(path, iterator=True) as fwf_iterator:
+            check(assert_type(fwf_iterator, TextFileReader), TextFileReader)
+        with read_fwf(path, chunksize=1) as fwf_iterator2:
+            check(assert_type(fwf_iterator2, TextFileReader), TextFileReader)
 
 
 def test_text_file_reader():
@@ -663,6 +705,15 @@ def test_read_excel_list():
         )
 
 
+def test_read_excel_dtypes():
+    # GH 440
+    df = pd.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"], "c": [10.0, 20.0, 30.3]})
+    with ensure_clean(".xlsx") as path:
+        check(assert_type(df.to_excel(path), None), type(None))
+        dtypes = {"a": np.int64, "b": str, "c": np.float64}
+        check(assert_type(read_excel(path, dtype=dtypes), pd.DataFrame), pd.DataFrame)
+
+
 def test_excel_writer():
     with ensure_clean(".xlsx") as path:
         with pd.ExcelWriter(path) as ew:
@@ -682,12 +733,46 @@ def test_excel_writer():
         check(assert_type(ef.close(), None), type(None))
 
 
+def test_excel_writer_engine():
+    with ensure_clean(".xlsx") as path:
+        with pd.ExcelWriter(path, engine="auto") as ew:
+            check(assert_type(ew, pd.ExcelWriter), pd.ExcelWriter)
+            DF.to_excel(ew, sheet_name="A")
+
+    with ensure_clean(".xlsx") as path:
+        with pd.ExcelWriter(path, engine="openpyxl") as ew:
+            check(assert_type(ew, pd.ExcelWriter), pd.ExcelWriter)
+            DF.to_excel(ew, sheet_name="A")
+            check(
+                assert_type(ew.engine, Literal["openpyxl", "odf", "xlsxwriter"]),
+                str,
+            )
+
+    with ensure_clean(".ods") as path:
+        with pd.ExcelWriter(path, engine="odf") as ew:
+            check(assert_type(ew, pd.ExcelWriter), pd.ExcelWriter)
+            DF.to_excel(ew, sheet_name="A")
+            check(
+                assert_type(ew.engine, Literal["openpyxl", "odf", "xlsxwriter"]),
+                str,
+            )
+
+    with ensure_clean(".xlsx") as path:
+        with pd.ExcelWriter(path, engine="xlsxwriter") as ew:
+            check(assert_type(ew, pd.ExcelWriter), pd.ExcelWriter)
+            DF.to_excel(ew, sheet_name="A")
+            check(
+                assert_type(ew.engine, Literal["openpyxl", "odf", "xlsxwriter"]),
+                str,
+            )
+
+
 def test_excel_writer_append_mode():
     with ensure_clean(".xlsx") as path:
         with pd.ExcelWriter(path, mode="w") as ew:
             DF.to_excel(ew, sheet_name="A")
-        with pd.ExcelWriter(path, mode="a") as ew:
-            pass
+        with pd.ExcelWriter(path, mode="a", engine="openpyxl") as ew:
+            DF.to_excel(ew, sheet_name="B")
 
 
 def test_to_string():
@@ -795,6 +880,7 @@ def test_read_sql_query_generator():
         con.close()
 
 
+@lxml_skip
 def test_read_html():
     check(assert_type(DF.to_html(), str), str)
     with ensure_clean() as path:

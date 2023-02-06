@@ -1,17 +1,20 @@
-import datetime
-import datetime as _dt
-from typing import (
-    Any,
+from collections.abc import (
     Callable,
-    ClassVar,
-    Generic,
     Hashable,
     Iterable,
     Iterator,
-    Literal,
     Mapping,
-    Pattern,
     Sequence,
+)
+import datetime
+import datetime as _dt
+from re import Pattern
+from typing import (
+    Any,
+    ClassVar,
+    Generic,
+    Literal,
+    TypeVar,
     overload,
 )
 
@@ -62,6 +65,8 @@ from pandas._typing import (
     Axes,
     Axis,
     AxisType,
+    AxisTypeColumn,
+    AxisTypeIndex,
     CalculationMethod,
     ColspaceArgType,
     CompressionOptions,
@@ -85,12 +90,14 @@ from pandas._typing import (
     Label,
     Level,
     ListLike,
+    ListLikeExceptSeriesAndStr,
     ListLikeU,
     MaskType,
     MergeHow,
     NaPosition,
     ParquetEngine,
     QuantileInterpolation,
+    RandomState,
     ReadBuffer,
     Renamer,
     ReplaceMethod,
@@ -118,6 +125,7 @@ from pandas.plotting import PlotAccessor
 
 _str = str
 _bool = bool
+_ScalarOrTupleT = TypeVar("_ScalarOrTupleT", bound=Scalar | tuple[Hashable, ...])
 
 class _iLocIndexerFrame(_iLocIndexer):
     @overload
@@ -144,7 +152,7 @@ class _iLocIndexerFrame(_iLocIndexer):
         | tuple[IndexType, int]
         | tuple[IndexType, IndexType]
         | tuple[int, IndexType],
-        value: float | Series | DataFrame | np.ndarray,
+        value: S1 | Series | DataFrame | np.ndarray | None,
     ) -> None: ...
 
 class _LocIndexerFrame(_LocIndexer):
@@ -153,6 +161,7 @@ class _LocIndexerFrame(_LocIndexer):
         self,
         idx: IndexType
         | MaskType
+        | Callable[[DataFrame], IndexType | MaskType | list[HashableT]]
         | list[HashableT]
         | tuple[
             IndexType | MaskType | list[HashableT] | Hashable,
@@ -162,26 +171,36 @@ class _LocIndexerFrame(_LocIndexer):
     @overload
     def __getitem__(
         self,
-        idx: tuple[int | StrLike | tuple[ScalarT, ...], int | StrLike],
+        idx: tuple[
+            int | StrLike | tuple[Scalar, ...] | Callable[[DataFrame], ScalarT],
+            int | StrLike | tuple[Scalar, ...],
+        ],
     ) -> Scalar: ...
     @overload
     def __getitem__(
         self,
         idx: ScalarT
-        | tuple[IndexType | MaskType | _IndexSliceTuple, ScalarT | None]
+        | Callable[[DataFrame], ScalarT]
+        | tuple[
+            IndexType
+            | MaskType
+            | _IndexSliceTuple
+            | Callable[[DataFrame], ScalarT | list[HashableT] | IndexType | MaskType],
+            ScalarT | None,
+        ]
         | None,
     ) -> Series: ...
     @overload
     def __setitem__(
         self,
         idx: MaskType | StrLike | _IndexSliceTuple | list[ScalarT],
-        value: S1 | ArrayLike | Series | DataFrame,
+        value: S1 | ArrayLike | Series | DataFrame | None,
     ) -> None: ...
     @overload
     def __setitem__(
         self,
         idx: tuple[_IndexSliceTuple, HashableT],
-        value: S1 | ArrayLike | Series[S1] | list,
+        value: S1 | ArrayLike | Series[S1] | list | None,
     ) -> None: ...
 
 class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
@@ -494,21 +513,18 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     def T(self) -> DataFrame: ...
     def __getattr__(self, name: str) -> Series: ...
     @overload
-    def __getitem__(self, idx: Scalar) -> Series: ...
+    def __getitem__(self, idx: Scalar | tuple[Hashable, ...]) -> Series: ...
     @overload
     def __getitem__(self, rows: slice) -> DataFrame: ...
     @overload
     def __getitem__(
         self,
-        idx: tuple
-        | Series[_bool]
+        idx: Series[_bool]
         | DataFrame
-        | list[_str]
-        | list[ScalarT]
         | Index
         | np_ndarray_str
         | np_ndarray_bool
-        | Sequence[tuple[Scalar, ...]],
+        | list[_ScalarOrTupleT],
     ) -> DataFrame: ...
     def isetitem(
         self, loc: int | Sequence[int], value: Scalar | ArrayLike | list[Any]
@@ -520,7 +536,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     def query(
         self, expr: _str, *, inplace: Literal[False] = ..., **kwargs
     ) -> DataFrame: ...
-    def eval(self, expr: _str, inplace: _bool = ..., **kwargs): ...
+    def eval(self, expr: _str, *, inplace: _bool = ..., **kwargs): ...
     def select_dtypes(
         self,
         include: _str | list[_str] | None = ...,
@@ -640,28 +656,29 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     def fillna(
         self,
         value: Scalar | NAType | dict | Series | DataFrame | None = ...,
+        *,
         method: FillnaOptions | None = ...,
         axis: AxisType | None = ...,
         limit: int = ...,
         downcast: dict | None = ...,
-        *,
         inplace: Literal[True],
     ) -> None: ...
     @overload
     def fillna(
         self,
         value: Scalar | NAType | dict | Series | DataFrame | None = ...,
+        *,
         method: FillnaOptions | None = ...,
         axis: AxisType | None = ...,
         limit: int = ...,
         downcast: dict | None = ...,
-        *,
         inplace: Literal[False] = ...,
     ) -> DataFrame: ...
     @overload
     def fillna(
         self,
         value: Scalar | NAType | dict | Series | DataFrame | None = ...,
+        *,
         method: FillnaOptions | None = ...,
         axis: AxisType | None = ...,
         inplace: _bool | None = ...,
@@ -673,10 +690,10 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         self,
         to_replace=...,
         value: Scalar | NAType | Sequence | Mapping | Pattern | None = ...,
+        *,
         limit: int | None = ...,
         regex=...,
         method: ReplaceMethod = ...,
-        *,
         inplace: Literal[True],
     ) -> None: ...
     @overload
@@ -684,6 +701,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         self,
         to_replace=...,
         value: Scalar | NAType | Sequence | Mapping | Pattern | None = ...,
+        *,
         inplace: Literal[False] = ...,
         limit: int | None = ...,
         regex=...,
@@ -694,6 +712,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         self,
         to_replace=...,
         value: Scalar | NAType | Sequence | Mapping | Pattern | None = ...,
+        *,
         inplace: _bool | None = ...,
         limit: int | None = ...,
         regex=...,
@@ -715,10 +734,10 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         | np.ndarray
         | Iterator[HashableT]
         | list[HashableT],
+        *,
         drop: _bool = ...,
         append: _bool = ...,
         verify_integrity: _bool = ...,
-        *,
         inplace: Literal[True],
     ) -> None: ...
     @overload
@@ -730,33 +749,20 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         | np.ndarray
         | Iterator[HashableT]
         | list[HashableT],
-        drop: _bool = ...,
-        append: _bool = ...,
-        verify_integrity: _bool = ...,
         *,
-        inplace: Literal[False],
-    ) -> DataFrame: ...
-    @overload
-    def set_index(
-        self,
-        keys: Label
-        | Series
-        | Index
-        | np.ndarray
-        | Iterator[HashableT]
-        | list[HashableT],
         drop: _bool = ...,
         append: _bool = ...,
         verify_integrity: _bool = ...,
+        inplace: Literal[False] = ...,
     ) -> DataFrame: ...
     @overload
     def reset_index(
         self,
         level: Level | Sequence[Level] = ...,
+        *,
         drop: _bool = ...,
         col_level: int | _str = ...,
         col_fill: Hashable = ...,
-        *,
         inplace: Literal[True],
         allow_duplicates: _bool = ...,
         names: Hashable | list[HashableT] = ...,
@@ -765,11 +771,11 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     def reset_index(
         self,
         level: Level | Sequence[Level] = ...,
-        drop: _bool = ...,
+        *,
         col_level: int | _str = ...,
         col_fill: Hashable = ...,
-        *,
-        inplace: Literal[False],
+        drop: _bool = ...,
+        inplace: Literal[False] = ...,
         allow_duplicates: _bool = ...,
         names: Hashable | list[HashableT] = ...,
     ) -> DataFrame: ...
@@ -777,17 +783,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     def reset_index(
         self,
         level: Level | Sequence[Level] = ...,
-        drop: _bool = ...,
         *,
-        col_level: int | _str = ...,
-        col_fill: Hashable = ...,
-        allow_duplicates: _bool = ...,
-        names: Hashable | list[HashableT] = ...,
-    ) -> DataFrame: ...
-    @overload
-    def reset_index(
-        self,
-        level: Level | Sequence[Level] = ...,
         drop: _bool = ...,
         inplace: _bool | None = ...,
         col_level: int | _str = ...,
@@ -802,43 +798,37 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     @overload
     def dropna(
         self,
+        *,
         axis: AxisType = ...,
         how: Literal["any", "all"] = ...,
         thresh: int | None = ...,
-        subset: list | None = ...,
-        *,
+        subset: ListLikeU | Scalar | None = ...,
         inplace: Literal[True],
     ) -> None: ...
     @overload
     def dropna(
         self,
-        axis: AxisType = ...,
-        how: Literal["any", "all"] = ...,
-        thresh: int | None = ...,
-        subset: list | None = ...,
         *,
-        inplace: Literal[False],
+        axis: AxisType = ...,
+        how: Literal["any", "all"] = ...,
+        thresh: int | None = ...,
+        subset: ListLikeU | Scalar | None = ...,
+        inplace: Literal[False] = ...,
     ) -> DataFrame: ...
     @overload
     def dropna(
         self,
+        *,
         axis: AxisType = ...,
         how: Literal["any", "all"] = ...,
         thresh: int | None = ...,
-        subset: list | None = ...,
-    ) -> DataFrame: ...
-    @overload
-    def dropna(
-        self,
-        axis: AxisType = ...,
-        how: Literal["any", "all"] = ...,
-        thresh: int | None = ...,
-        subset: list | None = ...,
+        subset: ListLikeU | Scalar | None = ...,
         inplace: _bool | None = ...,
     ) -> DataFrame | None: ...
     def drop_duplicates(
         self,
         subset=...,
+        *,
         keep: NaPosition | _bool = ...,
         inplace: _bool = ...,
         ignore_index: _bool = ...,
@@ -852,12 +842,12 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     def sort_values(
         self,
         by: _str | Sequence[_str],
+        *,
         axis: AxisType = ...,
         ascending: _bool | Sequence[_bool] = ...,
         kind: SortKind = ...,
         na_position: NaPosition = ...,
         ignore_index: _bool = ...,
-        *,
         inplace: Literal[True],
         key: Callable | None = ...,
     ) -> None: ...
@@ -865,31 +855,20 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     def sort_values(
         self,
         by: _str | Sequence[_str],
+        *,
         axis: AxisType = ...,
         ascending: _bool | Sequence[_bool] = ...,
         kind: SortKind = ...,
         na_position: NaPosition = ...,
         ignore_index: _bool = ...,
-        *,
-        inplace: Literal[False],
+        inplace: Literal[False] = ...,
         key: Callable | None = ...,
     ) -> DataFrame: ...
     @overload
     def sort_values(
         self,
         by: _str | Sequence[_str],
-        axis: AxisType = ...,
-        ascending: _bool | Sequence[_bool] = ...,
         *,
-        kind: SortKind = ...,
-        na_position: NaPosition = ...,
-        ignore_index: _bool = ...,
-        key: Callable | None = ...,
-    ) -> DataFrame: ...
-    @overload
-    def sort_values(
-        self,
-        by: _str | Sequence[_str],
         axis: AxisType = ...,
         ascending: _bool | Sequence[_bool] = ...,
         inplace: _bool | None = ...,
@@ -901,6 +880,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     @overload
     def sort_index(
         self,
+        *,
         axis: AxisType = ...,
         level: Level | None = ...,
         ascending: _bool | Sequence[_bool] = ...,
@@ -908,13 +888,13 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         na_position: NaPosition = ...,
         sort_remaining: _bool = ...,
         ignore_index: _bool = ...,
-        *,
         inplace: Literal[True],
         key: Callable | None = ...,
     ) -> None: ...
     @overload
     def sort_index(
         self,
+        *,
         axis: AxisType = ...,
         level: Level | list[int] | list[_str] | None = ...,
         ascending: _bool | Sequence[_bool] = ...,
@@ -922,26 +902,13 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         na_position: NaPosition = ...,
         sort_remaining: _bool = ...,
         ignore_index: _bool = ...,
-        *,
-        inplace: Literal[False],
+        inplace: Literal[False] = ...,
         key: Callable | None = ...,
     ) -> DataFrame: ...
     @overload
     def sort_index(
         self,
-        axis: AxisType = ...,
-        level: Level | list[int] | list[_str] | None = ...,
-        ascending: _bool | Sequence[_bool] = ...,
         *,
-        kind: SortKind = ...,
-        na_position: NaPosition = ...,
-        sort_remaining: _bool = ...,
-        ignore_index: _bool = ...,
-        key: Callable | None = ...,
-    ) -> DataFrame: ...
-    @overload
-    def sort_index(
-        self,
         axis: AxisType = ...,
         level: Level | list[int] | list[_str] | None = ...,
         ascending: _bool | Sequence[_bool] = ...,
@@ -1045,8 +1012,12 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         margins_name: _str = ...,
         observed: _bool = ...,
     ) -> DataFrame: ...
-    def stack(self, level: Level = ..., dropna: _bool = ...) -> DataFrame | Series: ...
-    def explode(self, column: _str | tuple, ignore_index: _bool = ...) -> DataFrame: ...
+    def stack(
+        self, level: Level | list[Level] = ..., dropna: _bool = ...
+    ) -> DataFrame | Series[Any]: ...
+    def explode(
+        self, column: Sequence[Hashable], ignore_index: _bool = ...
+    ) -> DataFrame: ...
     def unstack(
         self,
         level: Level = ...,
@@ -1089,36 +1060,149 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         *args,
         **kwargs,
     ) -> DataFrame: ...
+
+    # apply() overloads with default result_type of None, and is indifferent to axis
     @overload
     def apply(
         self,
-        f: Callable[..., Series],
-        axis: AxisType = ...,
+        f: Callable[..., ListLikeExceptSeriesAndStr | Series],
+        axis: AxisTypeIndex = ...,
         raw: _bool = ...,
-        result_type: Literal["expand", "reduce", "broadcast"] | None = ...,
+        result_type: None = ...,
         args=...,
         **kwargs,
     ) -> DataFrame: ...
     @overload
     def apply(
         self,
-        f: Callable[..., Scalar],
+        f: Callable[..., S1],
+        axis: AxisTypeIndex = ...,
+        raw: _bool = ...,
+        result_type: None = ...,
+        args=...,
+        **kwargs,
+    ) -> Series[S1]: ...
+    # Since non-scalar type T is not supported in Series[T],
+    # we separate this overload from the above one
+    @overload
+    def apply(
+        self,
+        f: Callable[..., Mapping],
+        axis: AxisTypeIndex = ...,
+        raw: _bool = ...,
+        result_type: None = ...,
+        args=...,
+        **kwargs,
+    ) -> Series: ...
+
+    # apply() overloads with keyword result_type, and axis does not matter
+    @overload
+    def apply(
+        self,
+        f: Callable[..., S1],
         axis: AxisType = ...,
         raw: _bool = ...,
-        result_type: Literal["expand", "reduce"] | None = ...,
         args=...,
+        *,
+        result_type: Literal["expand", "reduce"],
+        **kwargs,
+    ) -> Series[S1]: ...
+    @overload
+    def apply(
+        self,
+        f: Callable[..., ListLikeExceptSeriesAndStr | Series | Mapping],
+        axis: AxisType = ...,
+        raw: _bool = ...,
+        args=...,
+        *,
+        result_type: Literal["expand"],
+        **kwargs,
+    ) -> DataFrame: ...
+    @overload
+    def apply(
+        self,
+        f: Callable[..., ListLikeExceptSeriesAndStr | Mapping],
+        axis: AxisType = ...,
+        raw: _bool = ...,
+        args=...,
+        *,
+        result_type: Literal["reduce"],
         **kwargs,
     ) -> Series: ...
     @overload
     def apply(
         self,
-        f: Callable[..., Scalar],
-        result_type: Literal["broadcast"],
+        f: Callable[..., ListLikeExceptSeriesAndStr | Series | Scalar | Mapping],
         axis: AxisType = ...,
         raw: _bool = ...,
         args=...,
+        *,
+        result_type: Literal["broadcast"],
         **kwargs,
     ) -> DataFrame: ...
+
+    # apply() overloads with keyword result_type, and axis does matter
+    @overload
+    def apply(
+        self,
+        f: Callable[..., Series],
+        axis: AxisTypeIndex = ...,
+        raw: _bool = ...,
+        args=...,
+        *,
+        result_type: Literal["reduce"],
+        **kwargs,
+    ) -> Series: ...
+
+    # apply() overloads with default result_type of None, and keyword axis=1 matters
+    @overload
+    def apply(
+        self,
+        f: Callable[..., S1],
+        raw: _bool = ...,
+        result_type: None = ...,
+        args=...,
+        *,
+        axis: AxisTypeColumn,
+        **kwargs,
+    ) -> Series[S1]: ...
+    @overload
+    def apply(
+        self,
+        f: Callable[..., ListLikeExceptSeriesAndStr | Mapping],
+        raw: _bool = ...,
+        result_type: None = ...,
+        args=...,
+        *,
+        axis: AxisTypeColumn,
+        **kwargs,
+    ) -> Series: ...
+    @overload
+    def apply(
+        self,
+        f: Callable[..., Series],
+        raw: _bool = ...,
+        result_type: None = ...,
+        args=...,
+        *,
+        axis: AxisTypeColumn,
+        **kwargs,
+    ) -> DataFrame: ...
+
+    # apply() overloads with keyword axis=1 and keyword result_type
+    @overload
+    def apply(
+        self,
+        f: Callable[..., Series],
+        raw: _bool = ...,
+        args=...,
+        *,
+        axis: AxisTypeColumn,
+        result_type: Literal["reduce"],
+        **kwargs,
+    ) -> DataFrame: ...
+
+    # Add spacing between apply() overloads and remaining annotations
     def applymap(
         self, func: Callable, na_action: Literal["ignore"] | None = ..., **kwargs
     ) -> DataFrame: ...
@@ -1360,7 +1444,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     ) -> DataFrame: ...
     def astype(
         self,
-        dtype: _str | Dtype | dict[_str, _str | Dtype] | Series,
+        dtype: _str | Dtype | Mapping[HashableT, _str | Dtype] | Series,
         copy: _bool = ...,
         errors: _str = ...,
     ) -> DataFrame: ...
@@ -1379,8 +1463,8 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     @overload
     def bfill(
         self,
-        axis: AxisType | None = ...,
         *,
+        axis: AxisType | None = ...,
         inplace: Literal[True],
         limit: int | None = ...,
         downcast: dict | None = ...,
@@ -1388,8 +1472,8 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     @overload
     def bfill(
         self,
-        axis: AxisType | None = ...,
         *,
+        axis: AxisType | None = ...,
         inplace: Literal[False] = ...,
         limit: int | None = ...,
         downcast: dict | None = ...,
@@ -1398,9 +1482,9 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         self,
         lower: float | None = ...,
         upper: float | None = ...,
+        *,
         axis: AxisType | None = ...,
         inplace: _bool = ...,
-        *args,
         **kwargs,
     ) -> DataFrame: ...
     def copy(self, deep: _bool = ...) -> DataFrame: ...
@@ -1464,8 +1548,8 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     @overload
     def ffill(
         self,
-        axis: AxisType | None = ...,
         *,
+        axis: AxisType | None = ...,
         inplace: Literal[True],
         limit: int | None = ...,
         downcast: dict | None = ...,
@@ -1473,8 +1557,8 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     @overload
     def ffill(
         self,
-        axis: AxisType | None = ...,
         *,
+        axis: AxisType | None = ...,
         inplace: Literal[False] = ...,
         limit: int | None = ...,
         downcast: dict | None = ...,
@@ -1511,12 +1595,12 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     def interpolate(
         self,
         method: _str = ...,
+        *,
         axis: AxisType = ...,
         limit: int | None = ...,
         limit_direction: Literal["forward", "backward", "both"] = ...,
         limit_area: Literal["inside", "outside"] | None = ...,
         downcast: Literal["infer"] | None = ...,
-        *,
         inplace: Literal[True],
         **kwargs,
     ) -> None: ...
@@ -1524,12 +1608,12 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     def interpolate(
         self,
         method: _str = ...,
+        *,
         axis: AxisType = ...,
         limit: int | None = ...,
         limit_direction: Literal["forward", "backward", "both"] = ...,
         limit_area: Literal["inside", "outside"] | None = ...,
         downcast: Literal["infer"] | None = ...,
-        *,
         inplace: Literal[False],
         **kwargs,
     ) -> DataFrame: ...
@@ -1537,16 +1621,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     def interpolate(
         self,
         method: _str = ...,
-        axis: AxisType = ...,
-        limit: int | None = ...,
-        limit_direction: Literal["forward", "backward", "both"] = ...,
-        limit_area: Literal["inside", "outside"] | None = ...,
-        downcast: Literal["infer"] | None = ...,
-    ) -> DataFrame: ...
-    @overload
-    def interpolate(
-        self,
-        method: _str = ...,
+        *,
         axis: AxisType = ...,
         limit: int | None = ...,
         inplace: _bool | None = ...,
@@ -1554,7 +1629,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         limit_area: Literal["inside", "outside"] | None = ...,
         downcast: Literal["infer"] | None = ...,
         **kwargs,
-    ) -> DataFrame: ...
+    ) -> DataFrame | None: ...
     def keys(self) -> Index: ...
     def kurt(
         self,
@@ -1584,10 +1659,10 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         self,
         cond: Series | DataFrame | np.ndarray,
         other=...,
+        *,
         inplace: _bool = ...,
         axis: AxisType | None = ...,
         level: Level | None = ...,
-        *,  # Not actually positional-only, but needed due to depr in 1.5.0
         try_cast: _bool = ...,
     ) -> DataFrame: ...
     def max(
@@ -1721,37 +1796,37 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     def rename_axis(
         self,
         mapper=...,
-        *,
-        inplace: Literal[True],
         axis: AxisType | None = ...,
         copy: _bool = ...,
+        *,
+        inplace: Literal[True],
     ) -> None: ...
     @overload
     def rename_axis(
         self,
         mapper=...,
-        *,
-        inplace: Literal[False] = ...,
         axis: AxisType | None = ...,
         copy: _bool = ...,
+        *,
+        inplace: Literal[False] = ...,
     ) -> DataFrame: ...
     @overload
     def rename_axis(
         self,
-        *,
-        inplace: Literal[True],
         index: _str | Sequence[_str] | dict[_str | int, _str] | Callable | None = ...,
         columns: _str | Sequence[_str] | dict[_str | int, _str] | Callable | None = ...,
         copy: _bool = ...,
+        *,
+        inplace: Literal[True],
     ) -> None: ...
     @overload
     def rename_axis(
         self,
-        *,
-        inplace: Literal[False] = ...,
         index: _str | Sequence[_str] | dict[_str | int, _str] | Callable | None = ...,
         columns: _str | Sequence[_str] | dict[_str | int, _str] | Callable | None = ...,
         copy: _bool = ...,
+        *,
+        inplace: Literal[False] = ...,
     ) -> DataFrame: ...
     def resample(
         self,
@@ -1761,8 +1836,6 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         label: _str | None = ...,
         convention: TimestampConvention = ...,
         kind: Literal["timestamp", "period"] | None = ...,
-        # Not actually positional but needed due to deprecations
-        *,
         on: _str | None = ...,
         level: Level | None = ...,
         origin: Timestamp
@@ -1797,13 +1870,13 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         window: int | str | BaseOffset | BaseIndexer,
         min_periods: int | None = ...,
         center: _bool = ...,
-        *,
-        win_type: _str,
         on: Hashable | None = ...,
         axis: AxisType = ...,
         closed: IntervalClosedType | None = ...,
         step: int | None = ...,
         method: CalculationMethod = ...,
+        *,
+        win_type: _str,
     ) -> Window[DataFrame]: ...
     @overload
     def rolling(
@@ -1811,13 +1884,13 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         window: int | str | BaseOffset | BaseIndexer,
         min_periods: int | None = ...,
         center: _bool = ...,
-        *,
-        win_type: None = ...,
         on: Hashable | None = ...,
         axis: AxisType = ...,
         closed: IntervalClosedType | None = ...,
         step: int | None = ...,
         method: CalculationMethod = ...,
+        *,
+        win_type: None = ...,
     ) -> Rolling[DataFrame]: ...
     def rpow(
         self,
@@ -1847,7 +1920,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         frac: float | None = ...,
         replace: _bool = ...,
         weights: _str | ListLike | None = ...,
-        random_state: int | None = ...,
+        random_state: RandomState | None = ...,
         axis: SeriesAxisType | None = ...,
         ignore_index: _bool = ...,
     ) -> DataFrame: ...
@@ -2048,10 +2121,10 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         | Callable[[DataFrame], DataFrame]
         | Callable[[Any], _bool],
         other=...,
+        *,
         inplace: _bool = ...,
         axis: AxisType | None = ...,
         level: Level | None = ...,
-        *,  # Not actually positional-only, but needed due to depr in 1.5.0
         try_cast: _bool = ...,
     ) -> DataFrame: ...
     # Move from generic because Series is Generic and it returns Series[bool] there

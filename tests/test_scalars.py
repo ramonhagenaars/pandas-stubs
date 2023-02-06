@@ -13,7 +13,6 @@ import dateutil.tz
 import numpy as np
 from numpy import typing as npt
 import pandas as pd
-import pytest
 import pytz
 from typing_extensions import (
     TypeAlias,
@@ -27,8 +26,10 @@ from pandas._libs.tslibs import (
 from pandas._libs.tslibs.timedeltas import Components
 
 from tests import (
+    PD_LTE_15,
     TYPE_CHECKING_INVALID_USAGE,
     check,
+    pytest_warns_bounded,
 )
 
 from pandas.tseries.offsets import Day
@@ -49,6 +50,339 @@ else:
     TimestampSeries: TypeAlias = pd.Series
     PeriodSeries: TypeAlias = pd.Series
     OffsetSeries: TypeAlias = pd.Series
+
+
+def test_interval() -> None:
+    interval_i = pd.Interval(0, 1, closed="left")
+    interval_f = pd.Interval(0.0, 1.0, closed="right")
+    interval_ts = pd.Interval(
+        pd.Timestamp("2017-01-01"), pd.Timestamp("2017-01-02"), closed="both"
+    )
+    interval_td = pd.Interval(
+        pd.Timedelta("1 days"), pd.Timedelta("2 days"), closed="neither"
+    )
+
+    check(assert_type(interval_i, "pd.Interval[int]"), pd.Interval, int)
+    check(assert_type(interval_f, "pd.Interval[float]"), pd.Interval, float)
+    check(
+        assert_type(interval_ts, "pd.Interval[pd.Timestamp]"), pd.Interval, pd.Timestamp
+    )
+    check(
+        assert_type(interval_td, "pd.Interval[pd.Timedelta]"), pd.Interval, pd.Timedelta
+    )
+
+    check(
+        assert_type(interval_i.closed, Literal["left", "right", "both", "neither"]), str
+    )
+    check(assert_type(interval_i.closed_left, bool), bool)
+    check(assert_type(interval_i.closed_right, bool), bool)
+    check(assert_type(interval_i.is_empty, bool), bool)
+    check(assert_type(interval_i.left, int), int)
+    check(assert_type(interval_i.length, int), int)
+    check(assert_type(interval_i.mid, float), float)
+    check(assert_type(interval_i.open_left, bool), bool)
+    check(assert_type(interval_i.open_right, bool), bool)
+    check(assert_type(interval_i.right, int), int)
+
+    check(
+        assert_type(interval_f.closed, Literal["left", "right", "both", "neither"]), str
+    )
+    check(assert_type(interval_f.closed_left, bool), bool)
+    check(assert_type(interval_f.closed_right, bool), bool)
+    check(assert_type(interval_f.is_empty, bool), bool)
+    check(assert_type(interval_f.left, float), float)
+    check(assert_type(interval_f.length, float), float)
+    check(assert_type(interval_f.mid, float), float)
+    check(assert_type(interval_f.open_left, bool), bool)
+    check(assert_type(interval_f.open_right, bool), bool)
+    check(assert_type(interval_f.right, float), float)
+
+    check(
+        assert_type(interval_ts.closed, Literal["left", "right", "both", "neither"]),
+        str,
+    )
+    check(assert_type(interval_ts.closed_left, bool), bool)
+    check(assert_type(interval_ts.closed_right, bool), bool)
+    check(assert_type(interval_ts.is_empty, bool), bool)
+    check(assert_type(interval_ts.left, pd.Timestamp), pd.Timestamp)
+    check(assert_type(interval_ts.length, pd.Timedelta), pd.Timedelta)
+    check(assert_type(interval_ts.mid, pd.Timestamp), pd.Timestamp)
+    check(assert_type(interval_ts.open_left, bool), bool)
+    check(assert_type(interval_ts.open_right, bool), bool)
+    check(assert_type(interval_ts.right, pd.Timestamp), pd.Timestamp)
+
+    check(
+        assert_type(interval_td.closed, Literal["left", "right", "both", "neither"]),
+        str,
+    )
+    check(assert_type(interval_td.closed_left, bool), bool)
+    check(assert_type(interval_td.closed_right, bool), bool)
+    check(assert_type(interval_td.is_empty, bool), bool)
+    check(assert_type(interval_td.left, pd.Timedelta), pd.Timedelta)
+    check(assert_type(interval_td.length, pd.Timedelta), pd.Timedelta)
+    check(assert_type(interval_td.mid, pd.Timedelta), pd.Timedelta)
+    check(assert_type(interval_td.open_left, bool), bool)
+    check(assert_type(interval_td.open_right, bool), bool)
+    check(assert_type(interval_td.right, pd.Timedelta), pd.Timedelta)
+
+    check(
+        assert_type(interval_i.overlaps(pd.Interval(0.5, 1.5, closed="left")), bool),
+        bool,
+    )
+    check(
+        assert_type(interval_i.overlaps(pd.Interval(2, 3, closed="left")), bool), bool
+    )
+
+    check(
+        assert_type(interval_f.overlaps(pd.Interval(0.5, 1.5, closed="left")), bool),
+        bool,
+    )
+    check(
+        assert_type(interval_f.overlaps(pd.Interval(2, 3, closed="left")), bool), bool
+    )
+    ts1 = pd.Timestamp(year=2017, month=1, day=1)
+    ts2 = pd.Timestamp(year=2017, month=1, day=2)
+    check(
+        assert_type(interval_ts.overlaps(pd.Interval(ts1, ts2, closed="left")), bool),
+        bool,
+    )
+    td1 = pd.Timedelta(days=1)
+    td2 = pd.Timedelta(days=3)
+    check(
+        assert_type(interval_td.overlaps(pd.Interval(td1, td2, closed="left")), bool),
+        bool,
+    )
+
+
+def test_interval_math() -> None:
+    interval_i = pd.Interval(0, 1, closed="left")
+    interval_f = pd.Interval(0.0, 1.0, closed="right")
+    interval_ts = pd.Interval(
+        pd.Timestamp("2017-01-01"), pd.Timestamp("2017-01-02"), closed="both"
+    )
+    interval_td = pd.Interval(
+        pd.Timedelta("1 days"), pd.Timedelta("2 days"), closed="neither"
+    )
+
+    check(assert_type(interval_i * 3, "pd.Interval[int]"), pd.Interval, int)
+    check(assert_type(interval_f * 3, "pd.Interval[float]"), pd.Interval, float)
+    check(
+        assert_type(interval_td * 3, "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+        pd.Timedelta,
+    )
+
+    check(assert_type(interval_i * 3.5, "pd.Interval[float]"), pd.Interval, float)
+    check(assert_type(interval_f * 3.5, "pd.Interval[float]"), pd.Interval, float)
+    check(
+        assert_type(interval_td * 3.5, "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+        pd.Timedelta,
+    )
+
+    check(assert_type(3 * interval_i, "pd.Interval[int]"), pd.Interval, int)
+    check(assert_type(3 * interval_f, "pd.Interval[float]"), pd.Interval, float)
+    check(
+        assert_type(3 * interval_td, "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+        pd.Timedelta,
+    )
+
+    check(assert_type(3.5 * interval_i, "pd.Interval[float]"), pd.Interval, float)
+    check(assert_type(3.5 * interval_f, "pd.Interval[float]"), pd.Interval, float)
+    check(
+        assert_type(3.5 * interval_td, "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+        pd.Timedelta,
+    )
+
+    check(assert_type(interval_i / 3, "pd.Interval[float]"), pd.Interval, float)
+    check(assert_type(interval_f / 3, "pd.Interval[float]"), pd.Interval, float)
+    check(
+        assert_type(interval_td / 3, "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+        pd.Timedelta,
+    )
+
+    check(assert_type(interval_i / 3.5, "pd.Interval[float]"), pd.Interval, float)
+    check(assert_type(interval_f / 3.5, "pd.Interval[float]"), pd.Interval, float)
+    check(
+        assert_type(interval_td / 3.5, "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+        pd.Timedelta,
+    )
+
+    check(assert_type(interval_i // 3, "pd.Interval[int]"), pd.Interval, int)
+    check(assert_type(interval_f // 3, "pd.Interval[float]"), pd.Interval, float)
+    check(
+        assert_type(interval_td // 3, "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+        pd.Timedelta,
+    )
+
+    check(assert_type(interval_i // 3.5, "pd.Interval[float]"), pd.Interval, float)
+    check(assert_type(interval_f // 3.5, "pd.Interval[float]"), pd.Interval, float)
+    check(
+        assert_type(interval_td // 3.5, "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+        pd.Timedelta,
+    )
+
+    # Subtraction
+    check(assert_type(interval_i - 1, "pd.Interval[int]"), pd.Interval, int)
+    check(assert_type(interval_f - 1, "pd.Interval[float]"), pd.Interval, float)
+    check(
+        assert_type(interval_ts - pd.Timedelta(days=1), "pd.Interval[pd.Timestamp]"),
+        pd.Interval,
+        pd.Timestamp,
+    )
+    check(
+        assert_type(interval_td - pd.Timedelta(days=1), "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+        pd.Timedelta,
+    )
+
+    check(assert_type(interval_i - 1.5, "pd.Interval[float]"), pd.Interval, float)
+    check(assert_type(interval_f - 1.5, "pd.Interval[float]"), pd.Interval, float)
+    check(
+        assert_type(interval_ts - pd.Timedelta(days=1), "pd.Interval[pd.Timestamp]"),
+        pd.Interval,
+    )
+    check(
+        assert_type(interval_td - pd.Timedelta(days=1), "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+    )
+
+    # Addition
+    check(assert_type(interval_i + 1, "pd.Interval[int]"), pd.Interval)
+    check(assert_type(1 + interval_i, "pd.Interval[int]"), pd.Interval)
+    check(assert_type(interval_f + 1, "pd.Interval[float]"), pd.Interval)
+    check(assert_type(1 + interval_f, "pd.Interval[float]"), pd.Interval)
+    check(
+        assert_type(interval_ts + pd.Timedelta(days=1), "pd.Interval[pd.Timestamp]"),
+        pd.Interval,
+    )
+    check(
+        assert_type(pd.Timedelta(days=1) + interval_ts, "pd.Interval[pd.Timestamp]"),
+        pd.Interval,
+    )
+    check(
+        assert_type(interval_td + pd.Timedelta(days=1), "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+    )
+    check(
+        assert_type(pd.Timedelta(days=1) + interval_td, "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+    )
+
+    check(assert_type(interval_i + 1.5, "pd.Interval[float]"), pd.Interval)
+    check(assert_type(1.5 + interval_i, "pd.Interval[float]"), pd.Interval)
+    check(assert_type(interval_f + 1.5, "pd.Interval[float]"), pd.Interval)
+    check(assert_type(1.5 + interval_f, "pd.Interval[float]"), pd.Interval)
+    check(
+        assert_type(interval_ts + pd.Timedelta(days=1), "pd.Interval[pd.Timestamp]"),
+        pd.Interval,
+    )
+    check(
+        assert_type(pd.Timedelta(days=1) + interval_ts, "pd.Interval[pd.Timestamp]"),
+        pd.Interval,
+    )
+    check(
+        assert_type(interval_td + pd.Timedelta(days=1), "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+    )
+    check(
+        assert_type(pd.Timedelta(days=1) + interval_td, "pd.Interval[pd.Timedelta]"),
+        pd.Interval,
+    )
+
+
+def test_interval_cmp():
+    interval_i = pd.Interval(0, 1, closed="left")
+    interval_f = pd.Interval(0.0, 1.0, closed="right")
+    interval_ts = pd.Interval(
+        pd.Timestamp("2017-01-01"), pd.Timestamp("2017-01-02"), closed="both"
+    )
+    interval_td = pd.Interval(
+        pd.Timedelta("1 days"), pd.Timedelta("2 days"), closed="neither"
+    )
+
+    check(assert_type(0.5 in interval_i, bool), bool)
+    check(assert_type(1 in interval_i, bool), bool)
+    check(assert_type(1 in interval_f, bool), bool)
+    check(assert_type(pd.Timestamp("2000-1-1") in interval_ts, bool), bool)
+    check(assert_type(pd.Timedelta(days=1) in interval_td, bool), bool)
+
+    interval_index_int = pd.IntervalIndex([interval_i])
+    check(
+        assert_type(interval_index_int >= interval_i, np_ndarray_bool),
+        np.ndarray,
+        np.bool_,
+    )
+    check(
+        assert_type(interval_index_int < interval_i, np_ndarray_bool),
+        np.ndarray,
+        np.bool_,
+    )
+    check(
+        assert_type(interval_index_int <= interval_i, np_ndarray_bool),
+        np.ndarray,
+        np.bool_,
+    )
+    check(
+        assert_type(interval_index_int > interval_i, np_ndarray_bool),
+        np.ndarray,
+        np.bool_,
+    )
+
+    check(
+        assert_type(interval_i >= interval_index_int, np_ndarray_bool),
+        np.ndarray,
+        np.bool_,
+    )
+    check(
+        assert_type(interval_i < interval_index_int, np_ndarray_bool),
+        np.ndarray,
+        np.bool_,
+    )
+    check(
+        assert_type(interval_i <= interval_index_int, np_ndarray_bool),
+        np.ndarray,
+        np.bool_,
+    )
+    check(
+        assert_type(interval_i > interval_index_int, np_ndarray_bool),
+        np.ndarray,
+        np.bool_,
+    )
+
+    check(
+        assert_type(interval_index_int == interval_i, np_ndarray_bool),
+        np.ndarray,
+        np.bool_,
+    )
+    check(
+        assert_type(interval_index_int != interval_i, np_ndarray_bool),
+        np.ndarray,
+        np.bool_,
+    )
+
+    check(
+        assert_type(
+            interval_i == interval_index_int,
+            np_ndarray_bool,
+        ),
+        np.ndarray,
+        np.bool_,
+    )
+    check(
+        assert_type(
+            interval_i != interval_index_int,
+            np_ndarray_bool,
+        ),
+        np.ndarray,
+        np.bool_,
+    )
 
 
 def test_timedelta_construction() -> None:
@@ -272,14 +606,14 @@ def test_timedelta_add_sub() -> None:
     # TypeError: as_period, as_timestamp, as_datetime, as_date, as_datetime64,
     #            as_period_index, as_datetime_index, as_ndarray_dt64
     if TYPE_CHECKING_INVALID_USAGE:
-        td - as_period  # type: ignore[operator]
-        td - as_timestamp  # type: ignore[operator]
-        td - as_datetime  # type: ignore[operator]
-        td - as_date  # type: ignore[operator]
-        td - as_datetime64  # type: ignore[operator]
-        td - as_period_index  # type: ignore[operator]
-        td - as_datetime_index  # type: ignore[operator]
-        td - as_ndarray_dt64  # type: ignore[operator]
+        td - as_period  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        td - as_timestamp  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        td - as_datetime  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        td - as_date  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        td - as_datetime64  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        td - as_period_index  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        td - as_datetime_index  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        td - as_ndarray_dt64  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
 
     check(assert_type(td - td, pd.Timedelta), pd.Timedelta)
     check(assert_type(td - as_dt_timedelta, pd.Timedelta), pd.Timedelta)
@@ -338,9 +672,14 @@ def test_timedelta_add_sub() -> None:
 def test_timedelta_mul_div() -> None:
     td = pd.Timedelta("1 day")
 
-    with pytest.warns(FutureWarning):
-        i_idx = cast(pd.Int64Index, pd.Index([1, 2, 3], dtype=int))
-        f_idx = cast(pd.Float64Index, pd.Index([1.2, 2.2, 3.4], dtype=float))
+    i_idx = pd.Index([1, 2, 3], dtype=int)
+    f_idx = pd.Index([1.2, 2.2, 3.4], dtype=float)
+
+    with pytest_warns_bounded(
+        FutureWarning, upper="1.5.99", match="", upper_exception=AttributeError
+    ):
+        i_idx = cast(pd.Int64Index, i_idx)
+        f_idx = cast(pd.Float64Index, f_idx)
 
     np_intp_arr: npt.NDArray[np.integer] = np.array([1, 2, 3])
     np_float_arr: npt.NDArray[np.floating] = np.array([1.2, 2.2, 3.4])
@@ -406,14 +745,14 @@ def test_timedelta_mul_div() -> None:
     # TypeError: md_int, md_float, md_ndarray_intp, md_ndarray_float, mp_series_int,
     #            mp_series_float, md_int64_index, md_float_index
     if TYPE_CHECKING_INVALID_USAGE:
-        md_int // td  # type: ignore[operator]
-        md_float // td  # type: ignore[operator]
-        md_ndarray_intp // td  # type: ignore[operator]
-        md_ndarray_float // td  # type: ignore[operator]
-        mp_series_int // td  # type: ignore[operator]
-        md_series_float // td  # type: ignore[operator]
-        md_int64_index // td  # type: ignore[operator]
-        md_float_index // td  # type: ignore[operator]
+        md_int // td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        md_float // td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        md_ndarray_intp // td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        md_ndarray_float // td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        mp_series_int // td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        md_series_float // td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        md_int64_index // td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        md_float_index // td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
 
     check(assert_type(td / td, float), float)
     check(assert_type(td / pd.NaT, float), float)
@@ -440,24 +779,27 @@ def test_timedelta_mul_div() -> None:
     # TypeError: md_int, md_float, md_ndarray_intp, md_ndarray_float, mp_series_int,
     #            mp_series_float, md_int64_index, md_float_index
     if TYPE_CHECKING_INVALID_USAGE:
-        md_int / td  # type: ignore[operator]
-        md_float / td  # type: ignore[operator]
-        md_ndarray_intp / td  # type: ignore[operator]
-        md_ndarray_float / td  # type: ignore[operator]
-        # TODO: Series.__truediv__ says it supports Timedelta
-        #   it does not, in general, except for TimedeltaSeries
-        # mp_series_int / td  # type: ignore[operator]
-        # mp_series_float / td  # type: ignore[operator]
-        md_int64_index / td  # type: ignore[operator]
-        md_float_index / td  # type: ignore[operator]
+        md_int / td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        md_float / td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        md_ndarray_intp / td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        md_ndarray_float / td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        mp_series_int / td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        md_series_float / td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        md_int64_index / td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
+        md_float_index / td  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
 
 
 def test_timedelta_mod_abs_unary() -> None:
     td = pd.Timedelta("1 day")
 
-    with pytest.warns(FutureWarning):
-        i_idx = cast(pd.Int64Index, pd.Index([1, 2, 3], dtype=int))
-        f_idx = cast(pd.Float64Index, pd.Index([1.2, 2.2, 3.4], dtype=float))
+    i_idx = pd.Index([1, 2, 3], dtype=int)
+    f_idx = pd.Index([1.2, 2.2, 3.4], dtype=float)
+
+    with pytest_warns_bounded(
+        FutureWarning, upper="1.5.99", match="", upper_exception=AttributeError
+    ):
+        i_idx = cast(pd.Int64Index, i_idx)
+        f_idx = cast(pd.Float64Index, f_idx)
 
     check(assert_type(td % 3, pd.Timedelta), pd.Timedelta)
     check(assert_type(td % 3.5, pd.Timedelta), pd.Timedelta)
@@ -485,6 +827,7 @@ def test_timedelta_mod_abs_unary() -> None:
 
     # mypy reports dt.timedelta, even though __abs__ returns Timedelta
     check(assert_type(abs(td), pd.Timedelta), pd.Timedelta)  # type: ignore[assert-type]
+
     check(assert_type(td.__abs__(), pd.Timedelta), pd.Timedelta)
     check(assert_type(-td, pd.Timedelta), pd.Timedelta)
     check(assert_type(+td, pd.Timedelta), pd.Timedelta)
@@ -913,9 +1256,7 @@ def test_timestamp_cmp() -> None:
     c_dt_datetime = dt.datetime(year=2000, month=1, day=1)
     c_datetimeindex = pd.DatetimeIndex(["2000-1-1"])
     c_np_ndarray_dt64 = np_dt64_arr
-    # Typing provided since there is no way to get a Series[Timestamp],
-    # which is a different type from a TimestampSeries
-    c_series_dt64: pd.Series[pd.Timestamp] = pd.Series(
+    c_series_dt64: pd.Series[np.datetime64] = pd.Series(
         [1, 2, 3], dtype="datetime64[ns]"
     )
     c_series_timestamp = pd.Series(pd.DatetimeIndex(["2000-1-1"]))
@@ -1418,7 +1759,12 @@ def test_period_add_subtract() -> None:
     check(assert_type(p + p.freq, pd.Period), pd.Period)
     # offset_index is tested below
     offset_index = p - as_period_index
-    check(assert_type(p + offset_index, pd.PeriodIndex), pd.PeriodIndex)
+    if PD_LTE_15:
+        check(assert_type(p + offset_index, pd.PeriodIndex), pd.PeriodIndex)
+    else:
+        # https://github.com/pandas-dev/pandas/issues/50162
+        check(assert_type(p + offset_index, pd.PeriodIndex), pd.Index)
+
     check(assert_type(p + as_td_series, PeriodSeries), pd.Series, pd.Period)
     check(assert_type(p + as_timedelta_idx, pd.PeriodIndex), pd.PeriodIndex)
     check(assert_type(p + as_nat, NaTType), NaTType)
