@@ -15,6 +15,7 @@ from typing import (
     Literal,
     TypeVar,
     overload,
+    Generic,
 )
 
 from matplotlib.axes import Axes as PlotAxes
@@ -107,6 +108,7 @@ from pandas._typing import (
     StrLike,
     Suffixes,
     T as TType,
+    T3 as Structure,
     TimestampConvention,
     ValidationOptions,
     WriteBuffer,
@@ -200,7 +202,8 @@ class _LocIndexerFrame(_LocIndexer):
         value: S1 | ArrayLike | Series[S1] | list | None,
     ) -> None: ...
 
-class DataFrame(NDFrame, OpsMixin):
+
+class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
     @overload
