@@ -17,7 +17,6 @@ from typing import (
     ClassVar,
     Generic,
     Literal,
-    Union,
     overload,
 )
 
@@ -97,6 +96,7 @@ from pandas._typing import (
     JsonSeriesOrient,
     Level,
     ListLike,
+    ListLikeU,
     MaskType,
     NaPosition,
     QuantileInterpolation,
@@ -178,8 +178,7 @@ class _LocIndexerSeries(_LocIndexer, Generic[S1]):
     ) -> None: ...
 
 class Series(IndexOpsMixin, NDFrame, Generic[S1]):
-
-    _ListLike: TypeAlias = Union[ArrayLike, dict[_str, np.ndarray], list, tuple, Index]
+    _ListLike: TypeAlias = ArrayLike | dict[_str, np.ndarray] | list | tuple | Index
     __hash__: ClassVar[None]
 
     @overload
@@ -188,6 +187,16 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
         data: DatetimeIndex | Sequence[Timestamp | np.datetime64 | datetime],
         index: Axes | None = ...,
         dtype=...,
+        name: Hashable | None = ...,
+        copy: bool = ...,
+        fastpath: bool = ...,
+    ) -> TimestampSeries: ...
+    @overload
+    def __new__(
+        cls,
+        data: _ListLike,
+        dtype: Literal["datetime64[ns]"],
+        index: Axes | None = ...,
         name: Hashable | None = ...,
         copy: bool = ...,
         fastpath: bool = ...,
@@ -926,8 +935,8 @@ class Series(IndexOpsMixin, NDFrame, Generic[S1]):
     def isin(self, values: Iterable | Series[S1] | dict) -> Series[_bool]: ...
     def between(
         self,
-        left: Scalar | Sequence,
-        right: Scalar | Sequence,
+        left: Scalar | ListLikeU,
+        right: Scalar | ListLikeU,
         inclusive: Literal["both", "neither", "left", "right"] = ...,
     ) -> Series[_bool]: ...
     def isna(self) -> Series[_bool]: ...
@@ -1800,8 +1809,9 @@ class TimestampSeries(Series[Timestamp]):
     @property
     def dt(self) -> TimestampProperties: ...  # type: ignore[override]
     def __add__(self, other: TimedeltaSeries | np.timedelta64) -> TimestampSeries: ...  # type: ignore[override]
-    def __mul__(self, other: int | float | Series[int] | Series[float] | Sequence[int | float]) -> TimestampSeries: ...  # type: ignore[override]
-    def __truediv__(self, other: int | float | Series[int] | Series[float] | Sequence[int | float]) -> TimestampSeries: ...  # type: ignore[override]
+    def __radd__(self, other: TimedeltaSeries | np.timedelta64) -> TimestampSeries: ...  # type: ignore[override]
+    def __mul__(self, other: float | Series[int] | Series[float] | Sequence[float]) -> TimestampSeries: ...  # type: ignore[override]
+    def __truediv__(self, other: float | Series[int] | Series[float] | Sequence[float]) -> TimestampSeries: ...  # type: ignore[override]
     def mean(  # type: ignore[override]
         self,
         axis: SeriesAxisType | None = ...,
@@ -1842,7 +1852,7 @@ class TimedeltaSeries(Series[Timedelta]):
     def __mul__(  # type: ignore[override]
         self, other: num | Sequence[num] | Series[int] | Series[float]
     ) -> TimedeltaSeries: ...
-    def __sub__(  # type: ignore[override]
+    def __sub__(
         self, other: Timedelta | TimedeltaSeries | TimedeltaIndex | np.timedelta64
     ) -> TimedeltaSeries: ...
     def __truediv__(self, other: Timedelta | TimedeltaSeries | np.timedelta64 | TimedeltaIndex) -> Series[float]: ...  # type: ignore[override]

@@ -329,6 +329,8 @@ def test_hdfstore():
             DataFrame,
         )
         check(assert_type(store.get("df"), Union[DataFrame, Series]), DataFrame)
+        for key in store:
+            check(assert_type(key, str), str)
         check(assert_type(store.close(), None), type(None))
 
         store = HDFStore(path, model="r")
@@ -908,9 +910,7 @@ def test_sqlalchemy_selectable() -> None:
             class Base(metaclass=sqlalchemy.orm.decl_api.DeclarativeMeta):
                 __abstract__ = True
 
-            # error: Metaclass conflict: the metaclass of a derived class must be a
-            # (non-strict) subclass of the metaclasses of all its bases
-            class Temp(Base):  # type: ignore[misc]
+            class Temp(Base):
                 __tablename__ = "part"
                 quantity = sqlalchemy.Column(sqlalchemy.Integer)
 

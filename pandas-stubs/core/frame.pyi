@@ -12,7 +12,6 @@ from re import Pattern
 from typing import (
     Any,
     ClassVar,
-    Generic,
     Literal,
     TypeVar,
     overload,
@@ -55,8 +54,6 @@ from pandas._libs.missing import NAType
 from pandas._libs.tslibs import BaseOffset
 from pandas._typing import (
     S1,
-    T3 as Structure,
-    AggFuncType,
     AggFuncTypeBase,
     AggFuncTypeDictFrame,
     AggFuncTypeFrame,
@@ -203,8 +200,7 @@ class _LocIndexerFrame(_LocIndexer):
         value: S1 | ArrayLike | Series[S1] | list | None,
     ) -> None: ...
 
-class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
-
+class DataFrame(NDFrame, OpsMixin):
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
     @overload
@@ -546,7 +542,7 @@ class DataFrame(NDFrame, OpsMixin, Generic[Structure]):
         self,
         loc: int,
         column,
-        value: int | ListLike,
+        value: Scalar | ListLikeU | None,
         allow_duplicates: _bool = ...,
     ) -> None: ...
     def assign(self, **kwargs) -> DataFrame: ...

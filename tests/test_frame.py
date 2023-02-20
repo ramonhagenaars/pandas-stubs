@@ -1781,9 +1781,7 @@ def test_iloc_npint() -> None:
 # https://github.com/pandas-dev/pandas-stubs/issues/143
 def test_iloc_tuple() -> None:
     df = pd.DataFrame({"Char": ["A", "B", "C"], "Number": [1, 2, 3]})
-    df = df.iloc[
-        0:2,
-    ]
+    df = df.iloc[0:2,]
 
 
 def test_set_columns() -> None:
@@ -1813,7 +1811,6 @@ def test_frame_index_numpy() -> None:
 
 
 def test_frame_stack() -> None:
-
     multicol2 = pd.MultiIndex.from_tuples([("weight", "kg"), ("height", "m")])
     df_multi_level_cols2 = pd.DataFrame(
         [[1.0, 2.0], [3.0, 4.0]], index=["cat", "dog"], columns=multicol2
@@ -2403,3 +2400,22 @@ def test_npint_loc_indexer() -> None:
 
     a: npt.NDArray[np.uint64] = np.array([10, 30], dtype="uint64")
     check(assert_type(get_NDArray(df, a), pd.DataFrame), pd.DataFrame)
+
+
+def test_in_columns() -> None:
+    # GH 532 (PR)
+    df = pd.DataFrame(np.random.random((3, 4)), columns=["cat", "dog", "rat", "pig"])
+    cols = [c for c in df.columns if "at" in c]
+    check(assert_type(cols, list), list, str)
+    check(assert_type(df.loc[:, cols], pd.DataFrame), pd.DataFrame)
+    check(assert_type(df[cols], pd.DataFrame), pd.DataFrame)
+    check(assert_type(df.groupby(by=cols).sum(), pd.DataFrame), pd.DataFrame)
+
+
+def test_insert_newvalues() -> None:
+    df = pd.DataFrame({"a": [1, 2]})
+    ab = pd.DataFrame({"col1": [1, 2], "col2": [3, 4]})
+    ef = pd.DataFrame({"z": [4, 5, 6]})
+    assert assert_type(df.insert(loc=0, column="b", value=None), None) is None
+    assert assert_type(ab.insert(loc=0, column="newcol", value=[99, 99]), None) is None
+    assert assert_type(ef.insert(loc=0, column="g", value=4), None) is None

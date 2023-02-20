@@ -12,9 +12,11 @@ from typing import (
 import numpy as np
 from numpy import typing as npt
 import pandas as pd
-from pandas.core.indexes.numeric import NumericIndex
 import pytz
-from typing_extensions import assert_type
+from typing_extensions import (
+    assert_never,
+    assert_type,
+)
 
 from pandas._libs import NaTType
 from pandas._libs.tslibs import BaseOffset
@@ -25,6 +27,7 @@ if TYPE_CHECKING:
 else:
     FulldatetimeDict = Any
 from tests import (
+    PD_LTE_15,
     TYPE_CHECKING_INVALID_USAGE,
     check,
     pytest_warns_bounded,
@@ -45,6 +48,15 @@ if TYPE_CHECKING:
         TimedeltaSeries,
         TimestampSeries,
     )
+
+if TYPE_CHECKING:
+    from pandas.core.indexes.numeric import NumericIndex
+
+else:
+    if not PD_LTE_15:
+        from pandas import Index as NumericIndex
+    else:
+        from pandas.core.indexes.numeric import NumericIndex
 
 # Separately define here so pytest works
 np_ndarray_bool = npt.NDArray[np.bool_]
@@ -259,7 +271,7 @@ def test_fail_on_adding_two_timestamps() -> None:
     s1 = pd.Series(pd.to_datetime(["2022-05-01", "2022-06-01"]))
     s2 = pd.Series(pd.to_datetime(["2022-05-15", "2022-06-15"]))
     if TYPE_CHECKING_INVALID_USAGE:
-        ssum: pd.Series = s1 + s2  # type: ignore[operator]
+        ssum: pd.Series = s1 + s2  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
         ts = pd.Timestamp("2022-06-30")
         tsum: pd.Series = s1 + ts  # type: ignore[operator] # pyright: ignore[reportGeneralTypeIssues]
 
@@ -1113,3 +1125,13 @@ def test_mean_median_std() -> None:
     check(assert_type(s2.mean(), pd.Timestamp), pd.Timestamp)
     check(assert_type(s2.median(), pd.Timestamp), pd.Timestamp)
     check(assert_type(s2.std(), pd.Timedelta), pd.Timedelta)
+
+
+def test_timestamp_strptime_fails():
+    if TYPE_CHECKING_INVALID_USAGE:
+        assert_never(
+            pd.Timestamp.strptime(
+                "2023-02-16",  # type: ignore[arg-type] # pyright: ignore[reportGeneralTypeIssues]
+                "%Y-%M-%D",  # type: ignore[arg-type] # pyright: ignore[reportGeneralTypeIssues]
+            )
+        )
